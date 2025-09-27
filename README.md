@@ -15,7 +15,8 @@ ScanAR uses your device’s camera to detect a specific QR code and overlays hel
 ---
 
 ## 📸 Demo
-*(Add a screenshot or GIF of you scanning the QR and seeing the overlay)*
+
+<img width="603" height="1311" alt="image" src="https://github.com/user-attachments/assets/c2d3114c-69b1-4dfa-ac38-0be9628e244f" />
 
 ---
 
