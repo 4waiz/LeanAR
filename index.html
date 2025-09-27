@@ -3,149 +3,177 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ScanAR – unlock on scan</title>
+<title>ScanAR – overlay in camera view</title>
 <script src="https://unpkg.com/html5-qrcode" defer></script>
 <style>
-  :root{--bg:#0f172a;--panel:#111827;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa;}
-  *{box-sizing:border-box} body{margin:0;font-family:system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,Arial;
-  background:linear-gradient(180deg,var(--bg),#0b1025 40%,#0a0f22);color:var(--text);min-height:100svh;display:grid;place-items:center;padding:2rem}
-  .card{width:min(720px,100%);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-    border-radius:1rem;padding:1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.35);backdrop-filter:blur(6px)}
-  h1{margin:0 0 .75rem;font-size:clamp(1.3rem,2.5vw + .6rem,2rem)} p{margin:0 0 1rem;color:var(--muted)}
-  .row{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.5rem}
-  button{appearance:none;border:1px solid rgba(255,255,255,.16);background:linear-gradient(180deg,#1f2937,#111827);
-    color:var(--text);padding:.65rem 1rem;border-radius:.75rem;cursor:pointer;font-weight:600}
-  button[disabled]{opacity:.5;cursor:not-allowed}
-  .video-wrap{margin-top:1rem;display:none;border:1px solid rgba(255,255,255,.1);border-radius:.75rem;overflow:hidden;background:#000}
-  .video-wrap.active{display:block} video{width:100%;display:block;background:#000}
-  .status{margin-top:.5rem;font-size:.95rem} .ok{color:#86efac} .bad{color:#fca5a5}
-  #scanner{margin-top:.75rem;border-radius:.75rem;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
-  dialog{border:none;padding:0;border-radius:.75rem;overflow:hidden;background:var(--panel);color:var(--text);
-    box-shadow:0 25px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);max-width:min(420px,95vw)}
-  dialog::backdrop{background:rgba(0,0,0,.55)} .modal-header{display:flex;justify-content:space-between;align-items:center;
-    padding:.75rem 1rem;border-bottom:1px solid rgba(255,255,255,.08)} .modal-body{padding:.75rem;background:#0b1226}
-  .modal-body img{max-width:100%;display:block;border-radius:.5rem}
+  :root{--accent:#60a5fa;--text:#e5e7eb;--muted:#9ca3af;--bg:#0f172a}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,Arial;background:var(--bg);color:var(--text);min-height:100svh;display:grid;place-items:center;padding:12px}
+  .wrap{width:min(820px,100%);display:grid;gap:10px}
+  h1{margin:0;font-size:clamp(1.1rem,2vw + .6rem,1.6rem)}
+  .status{font-size:.95rem;color:var(--muted)}
+  /* Scanner region is relative so we can absolutely-position the AR overlay on top. */
+  #scannerWrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}
+  #scanner{width:100%;background:#000;min-height:320px}
+  /* AR overlay that sits above the camera feed */
+  #arLayer{position:absolute;inset:0;pointer-events:none} /* default no interaction */
+  .hud{position:absolute;inset:12px auto auto 12px;display:flex;gap:8px;pointer-events:auto} /* clickable */
+  .hud button{appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.45);backdrop-filter:blur(6px);
+    color:#fff;padding:.45rem .7rem;border-radius:.65rem;font-weight:600;cursor:pointer}
+  .hud button:disabled{opacity:.5;cursor:not-allowed}
+  .hint{position:absolute;right:12px;bottom:12px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);padding:.35rem .55rem;border-radius:.5rem;font-size:.85rem}
+  /* Draggable media nodes */
+  .draggable{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:10px;border:1px solid rgba(255,255,255,.25);pointer-events:auto}
+  #arImage{max-width:55%;max-height:55%;display:none}
+  #arVideo{max-width:65%;max-height:65%;display:none;background:#000}
+  /* Grab handle */
+  .handle{position:absolute;top:-34px;left:0;display:flex;gap:8px}
+  .handle button{appearance:none;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.45);
+    color:#fff;padding:.25rem .5rem;border-radius:.5rem;cursor:pointer}
 </style>
 </head>
 <body>
-  <main class="card">
-    <h1>Scan to Unlock</h1>
-    <p>Scan the QR code to reveal the content.</p>
+<div class="wrap">
+  <h1>Scan to unlock AR overlay</h1>
+  <div class="status" id="scanStatus">Waiting for camera…</div>
 
-    <!-- Scanner area -->
+  <div id="scannerWrap">
     <div id="scanner"></div>
-    <div id="scanStatus" class="status">Waiting for camera…</div>
 
-    <!-- Unlocked area (hidden until success) -->
-    <section id="unlocked" style="display:none; margin-top:1.25rem;">
-      <p class="status ok">✅ Scan successful — content unlocked.</p>
-      <div class="row" role="group" aria-label="Media actions">
-        <button id="toggleVideo" type="button" aria-expanded="false" aria-controls="videoRegion">▶️ Play video</button>
-        <button id="openImage" type="button">🖼️ Show image</button>
+    <!-- AR overlay (hidden until success) -->
+    <div id="arLayer" style="display:none;">
+      <!-- Floating controls inside camera view -->
+      <div class="hud">
+        <button id="btnShowImage" disabled>🖼️ Image</button>
+        <button id="btnShowVideo" disabled>▶️ Video</button>
+        <button id="btnHide" disabled>✕ Hide</button>
       </div>
-      <div id="videoRegion" class="video-wrap" aria-live="polite">
-        <video id="videoEl" controls preload="metadata" playsinline>
-          <source src="video.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-      <p class="status">Files expected in this folder: <code>video.mp4</code>, <code>image.png</code>.</p>
-    </section>
-  </main>
+      <div class="hint">Drag the media around</div>
 
-  <!-- Image Modal -->
-  <dialog id="imgModal" aria-labelledby="imgTitle">
-    <div class="modal-header">
-      <strong id="imgTitle">Image preview</strong>
-      <button id="closeModal" type="button" style="background:transparent;border:0;color:var(--text);font-size:18px;">✕</button>
+      <!-- Draggable media nodes -->
+      <img id="arImage" class="draggable" src="image.png" alt="AR image" />
+      <video id="arVideo" class="draggable" playsinline muted loop preload="metadata">
+        <source src="video.mp4" type="video/mp4" />
+      </video>
     </div>
-    <div class="modal-body">
-      <img src="image.png" alt="Preview of image.png" loading="lazy">
-    </div>
-  </dialog>
+  </div>
+</div>
 
 <script>
   // ====== CONFIGURE THIS ======
-  // Accept only this exact QR text. Leave as "" to accept ANY QR.
-  const EXPECTED_CODE = "SCAN-OK";  // <-- change to your expected payload
+  const EXPECTED_CODE = "SCAN-OK"; // change to the QR payload you expect; use "" to accept any
   // ============================
 
   const scanStatus = document.getElementById('scanStatus');
   const scannerDiv = document.getElementById('scanner');
-  const unlocked = document.getElementById('unlocked');
+  const arLayer = document.getElementById('arLayer');
+  const arImage = document.getElementById('arImage');
+  const arVideo = document.getElementById('arVideo');
+  const btnImg = document.getElementById('btnShowImage');
+  const btnVid = document.getElementById('btnShowVideo');
+  const btnHide = document.getElementById('btnHide');
 
-  // Start QR scanner when library loads
+  // Simple draggable behavior for AR nodes
+  function makeDraggable(el) {
+    let dragging = false, startX=0, startY=0, origX=0, origY=0;
+
+    function down(e){
+      dragging = true;
+      const p = (e.touches ? e.touches[0] : e);
+      startX = p.clientX; startY = p.clientY;
+      const r = el.getBoundingClientRect();
+      origX = r.left + r.width/2; origY = r.top + r.height/2;
+      document.addEventListener('mousemove', move);
+      document.addEventListener('touchmove', move, {passive:false});
+      document.addEventListener('mouseup', up);
+      document.addEventListener('touchend', up);
+    }
+    function move(e){
+      if(!dragging) return;
+      if(e.cancelable) e.preventDefault();
+      const p = (e.touches ? e.touches[0] : e);
+      const dx = p.clientX - startX;
+      const dy = p.clientY - startY;
+      const wrap = document.getElementById('scannerWrap').getBoundingClientRect();
+      // compute new center
+      let cx = origX + dx, cy = origY + dy;
+      // convert to percentages to keep relative on resize
+      const leftPct = ((cx - wrap.left)/wrap.width)*100;
+      const topPct  = ((cy - wrap.top)/wrap.height)*100;
+      el.style.left = leftPct + "%";
+      el.style.top  = topPct + "%";
+      el.style.transform = "translate(-50%,-50%)";
+    }
+    function up(){
+      dragging = false;
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('mouseup', up);
+      document.removeEventListener('touchend', up);
+    }
+    el.addEventListener('mousedown', down);
+    el.addEventListener('touchstart', down, {passive:true});
+  }
+  makeDraggable(arImage);
+  makeDraggable(arVideo);
+
+  // Buttons logic
+  function showImage() {
+    arVideo.pause(); arVideo.style.display = "none";
+    arImage.style.display = "block";
+  }
+  function showVideo() {
+    arImage.style.display = "none";
+    arVideo.style.display = "block";
+    // Autoplay policies usually allow autoplay if muted (we set muted)
+    arVideo.play().catch(()=>{});
+  }
+  function hideAll() {
+    arImage.style.display = "none";
+    arVideo.pause(); arVideo.style.display = "none";
+  }
+  btnImg.addEventListener('click', showImage);
+  btnVid.addEventListener('click', showVideo);
+  btnHide.addEventListener('click', hideAll);
+
+  // Scanner
   window.addEventListener('load', async () => {
     if (!window.Html5Qrcode) {
-      scanStatus.textContent = "Failed to load scanner library.";
-      scanStatus.className = "status bad";
-      return;
+      scanStatus.textContent = "Failed to load scanner library."; return;
     }
-
     const html5QrCode = new Html5Qrcode("scanner");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true };
+    const config = { fps: 10, qrbox: (viewW, viewH) => {
+      const size = Math.min(viewW, viewH) * 0.7; // responsive square
+      return { width: size, height: size };
+    }};
 
-    function onSuccess(decodedText) {
+    function onScanSuccess(decodedText) {
       const ok = !EXPECTED_CODE || decodedText.trim() === EXPECTED_CODE;
       if (!ok) {
-        scanStatus.innerHTML = `❌ Wrong code scanned. Looking for: <code>${EXPECTED_CODE}</code>`;
-        scanStatus.className = "status bad";
-        return; // keep scanning
+        scanStatus.innerHTML = `❌ Wrong code. Looking for: <code>${EXPECTED_CODE}</code>`;
+        return;
       }
-      // Stop and hide scanner, unlock UI
-      html5QrCode.stop().then(() => {
-        scannerDiv.style.display = "none";
-        scanStatus.style.display = "none";
-        unlocked.style.display = "block";
-        // optional: auto play video
-        // document.getElementById('videoEl').play().catch(()=>{});
-      });
+      // Unlock: keep camera running but show overlay controls on top
+      scanStatus.textContent = "✅ Scan successful — overlay unlocked.";
+      arLayer.style.display = "block";
+      btnImg.disabled = btnVid.disabled = btnHide.disabled = false;
+
+      // OPTIONAL: if you want to stop scanning after success, uncomment:
+      // html5QrCode.stop();
     }
 
-    function onError(errMsg) {
-      // Noise is expected during scanning; keep it quiet
-    }
+    function onScanError(_) { /* ignore noisy frames */ }
 
-    // Request camera and start
     try {
       scanStatus.textContent = "Requesting camera…";
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras || !cameras.length) throw new Error("No camera found");
+      const cams = await Html5Qrcode.getCameras();
+      if (!cams || !cams.length) throw new Error("No camera found");
       scanStatus.textContent = "Point your camera at the QR code.";
-      scanStatus.className = "status";
-      await html5QrCode.start({ facingMode: "environment" }, config, onSuccess, onError);
+      await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanError);
     } catch (e) {
       scanStatus.textContent = "Camera unavailable: " + (e.message || e);
-      scanStatus.className = "status bad";
     }
-  });
-
-  // ====== Media UI (same as before) ======
-  const toggleBtn = document.getElementById('toggleVideo');
-  const videoRegion = document.getElementById('videoRegion');
-  const videoEl = document.getElementById('videoEl');
-  function toggleVideo() {
-    const isActive = videoRegion.classList.toggle('active');
-    toggleBtn.setAttribute('aria-expanded', String(isActive));
-    toggleBtn.textContent = isActive ? '⏹️ Hide video' : '▶️ Play video';
-    if (isActive) videoEl.play().catch(()=>{});
-    else videoEl.pause();
-  }
-  toggleBtn.addEventListener('click', toggleVideo);
-
-  const modal = document.getElementById('imgModal');
-  const openImage = document.getElementById('openImage');
-  const closeModal = document.getElementById('closeModal');
-  openImage.addEventListener('click', () => {
-    if (typeof modal.showModal === 'function') modal.showModal();
-    else window.open('image.png','_blank','noopener');
-  });
-  closeModal.addEventListener('click', () => modal.close());
-  modal.addEventListener('cancel', e => { e.preventDefault(); modal.close(); });
-  modal.addEventListener('click', e => {
-    const r = modal.getBoundingClientRect();
-    const inside = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
-    if (!inside) modal.close();
   });
 </script>
 </body>
