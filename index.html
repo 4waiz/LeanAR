@@ -61,29 +61,29 @@
 </div>
 
 <script>
-  // ====== CONFIGURE THIS ======
-  const EXPECTED_CODE = "SCAN-OK"; // change to the QR payload you expect; use "" to accept any
-  // ============================
+  // Accept only this payload; set to "" to accept any
+  const EXPECTED_CODE = "SCAN-OK";
+
+  // How long after the last valid frame the overlay should remain visible
+  const HIDE_AFTER_MS = 700;
 
   const scanStatus = document.getElementById('scanStatus');
   const scannerDiv = document.getElementById('scanner');
-  const arLayer = document.getElementById('arLayer');
-  const arImage = document.getElementById('arImage');
-  const arVideo = document.getElementById('arVideo');
-  const btnImg = document.getElementById('btnShowImage');
-  const btnVid = document.getElementById('btnShowVideo');
-  const btnHide = document.getElementById('btnHide');
+  const arLayer   = document.getElementById('arLayer');
+  const arImage   = document.getElementById('arImage');
+  const arVideo   = document.getElementById('arVideo');
+  const btnImg    = document.getElementById('btnShowImage');
+  const btnVid    = document.getElementById('btnShowVideo');
+  const btnHide   = document.getElementById('btnHide');
 
-  // Simple draggable behavior for AR nodes
+  // ---- draggable (unchanged) ----
   function makeDraggable(el) {
-    let dragging = false, startX=0, startY=0, origX=0, origY=0;
-
+    let dragging=false,startX=0,startY=0,origX=0,origY=0;
     function down(e){
-      dragging = true;
-      const p = (e.touches ? e.touches[0] : e);
-      startX = p.clientX; startY = p.clientY;
-      const r = el.getBoundingClientRect();
-      origX = r.left + r.width/2; origY = r.top + r.height/2;
+      dragging=true;
+      const p=(e.touches?e.touches[0]:e);
+      startX=p.clientX; startY=p.clientY;
+      const r=el.getBoundingClientRect(); origX=r.left+r.width/2; origY=r.top+r.height/2;
       document.addEventListener('mousemove', move);
       document.addEventListener('touchmove', move, {passive:false});
       document.addEventListener('mouseup', up);
@@ -92,21 +92,16 @@
     function move(e){
       if(!dragging) return;
       if(e.cancelable) e.preventDefault();
-      const p = (e.touches ? e.touches[0] : e);
-      const dx = p.clientX - startX;
-      const dy = p.clientY - startY;
-      const wrap = document.getElementById('scannerWrap').getBoundingClientRect();
-      // compute new center
-      let cx = origX + dx, cy = origY + dy;
-      // convert to percentages to keep relative on resize
-      const leftPct = ((cx - wrap.left)/wrap.width)*100;
-      const topPct  = ((cy - wrap.top)/wrap.height)*100;
-      el.style.left = leftPct + "%";
-      el.style.top  = topPct + "%";
-      el.style.transform = "translate(-50%,-50%)";
+      const p=(e.touches?e.touches[0]:e);
+      const dx=p.clientX-startX, dy=p.clientY-startY;
+      const wrap=document.getElementById('scannerWrap').getBoundingClientRect();
+      let cx=origX+dx, cy=origY+dy;
+      const leftPct=((cx-wrap.left)/wrap.width)*100;
+      const topPct =((cy-wrap.top )/wrap.height)*100;
+      el.style.left=leftPct+"%"; el.style.top=topPct+"%"; el.style.transform="translate(-50%,-50%)";
     }
     function up(){
-      dragging = false;
+      dragging=false;
       document.removeEventListener('mousemove', move);
       document.removeEventListener('touchmove', move);
       document.removeEventListener('mouseup', up);
@@ -118,63 +113,72 @@
   makeDraggable(arImage);
   makeDraggable(arVideo);
 
-  // Buttons logic
-  function showImage() {
-    arVideo.pause(); arVideo.style.display = "none";
-    arImage.style.display = "block";
-  }
-  function showVideo() {
-    arImage.style.display = "none";
-    arVideo.style.display = "block";
-    // Autoplay policies usually allow autoplay if muted (we set muted)
-    arVideo.play().catch(()=>{});
-  }
-  function hideAll() {
-    arImage.style.display = "none";
-    arVideo.pause(); arVideo.style.display = "none";
-  }
+  // ---- media controls (unchanged) ----
+  function showImage(){ arVideo.pause(); arVideo.style.display="none"; arImage.style.display="block"; }
+  function showVideo(){ arImage.style.display="none"; arVideo.style.display="block"; arVideo.play().catch(()=>{}); }
+  function hideAll(){   arImage.style.display="none"; arVideo.pause(); arVideo.style.display="none"; }
   btnImg.addEventListener('click', showImage);
   btnVid.addEventListener('click', showVideo);
   btnHide.addEventListener('click', hideAll);
 
-  // Scanner
-  window.addEventListener('load', async () => {
-    if (!window.Html5Qrcode) {
-      scanStatus.textContent = "Failed to load scanner library."; return;
+  // ---- visibility logic tied to continuous detection ----
+  let lastSeenOk = 0;
+  let overlayVisible = false;
+
+  function showOverlay() {
+    if (overlayVisible) return;
+    overlayVisible = true;
+    arLayer.style.display = "block";
+    btnImg.disabled = btnVid.disabled = btnHide.disabled = false;
+    scanStatus.textContent = "✅ QR in view — overlay unlocked.";
+  }
+  function hideOverlay() {
+    if (!overlayVisible) return;
+    overlayVisible = false;
+    arLayer.style.display = "none";
+    btnImg.disabled = btnVid.disabled = btnHide.disabled = true;
+    hideAll();
+    scanStatus.innerHTML = EXPECTED_CODE
+      ? `❌ Wrong/lost code. Looking for: <code>${EXPECTED_CODE}</code>`
+      : "❌ QR lost.";
+  }
+
+  // Heartbeat that hides the overlay if the code hasn't been seen recently
+  setInterval(() => {
+    if (overlayVisible && (Date.now() - lastSeenOk) > HIDE_AFTER_MS) {
+      hideOverlay();
     }
+  }, Math.max(120, HIDE_AFTER_MS / 3));
+
+  // ---- scanner setup ----
+  window.addEventListener('load', async () => {
+    if (!window.Html5Qrcode) { scanStatus.textContent="Failed to load scanner library."; return; }
+
     const html5QrCode = new Html5Qrcode("scanner");
-    const config = { fps: 10, qrbox: (viewW, viewH) => {
-      const size = Math.min(viewW, viewH) * 0.7; // responsive square
-      return { width: size, height: size };
-    }};
+    const config = { fps: 15, qrbox: (w,h)=>({ width: Math.min(w,h)*0.72, height: Math.min(w,h)*0.72 }) };
 
     function onScanSuccess(decodedText) {
       const ok = !EXPECTED_CODE || decodedText.trim() === EXPECTED_CODE;
-      if (!ok) {
-        scanStatus.innerHTML = `❌ Wrong code. Looking for: <code>${EXPECTED_CODE}</code>`;
-        return;
+      if (ok) {
+        lastSeenOk = Date.now();
+        showOverlay();               // keep visible while we keep seeing the code
+      } else {
+        // Don't immediately hide to avoid flicker; the heartbeat will hide if it keeps failing.
       }
-      // Unlock: keep camera running but show overlay controls on top
-      scanStatus.textContent = "✅ Scan successful — overlay unlocked.";
-      arLayer.style.display = "block";
-      btnImg.disabled = btnVid.disabled = btnHide.disabled = false;
-
-      // OPTIONAL: if you want to stop scanning after success, uncomment:
-      // html5QrCode.stop();
     }
-
     function onScanError(_) { /* ignore noisy frames */ }
 
     try {
-      scanStatus.textContent = "Requesting camera…";
+      scanStatus.textContent="Requesting camera…";
       const cams = await Html5Qrcode.getCameras();
       if (!cams || !cams.length) throw new Error("No camera found");
-      scanStatus.textContent = "Point your camera at the QR code.";
+      scanStatus.textContent="Point your camera at the QR code.";
       await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanError);
-    } catch (e) {
-      scanStatus.textContent = "Camera unavailable: " + (e.message || e);
+    } catch(e) {
+      scanStatus.textContent="Camera unavailable: " + (e.message || e);
     }
   });
 </script>
+
 </body>
 </html>
