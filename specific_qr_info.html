@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+  <title>Specific QR → Info</title>
+  <style>
+    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    #wrap { position:relative; width:100%; height:100%; overflow:hidden; }
+    #video { position:absolute; width:100%; height:100%; object-fit:cover; transform: scaleX(-1); } /* selfie mirror */
+    #canvas { display:none; }
+    #hud { position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:center; pointer-events:none; padding:24px; background: linear-gradient(180deg, rgba(0,0,0,0) 58%, rgba(0,0,0,0.35) 100%); }
+    #infoCard {
+      display:none;
+      pointer-events:auto;
+      backdrop-filter: blur(6px);
+      background: rgba(0,0,0,0.6);
+      padding: 16px 18px; border-radius: 14px; width:min(680px,92vw);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    #infoCard h1 { margin:0 0 6px; font-size:20px; }
+    #infoCard p  { margin:6px 0; font-size:16px; opacity:0.95; }
+    #infoCard a  { color:#8fd3ff; text-decoration:underline; }
+    #hint { position:absolute; top:12px; left:12px; right:12px; text-align:center; opacity:.85; font-size:14px; background: rgba(0,0,0,.35); padding:8px 10px; border-radius:12px; }
+    #box { position:absolute; border:3px solid #4af; border-radius:8px; display:none; }
+    #unrecognized { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); font-size:14px; opacity:0.85; display:none; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="canvas"></canvas>
+    <div id="box"></div>
+    <div id="hint">Point your camera at the specific QR code</div>
+    <div id="hud">
+      <div id="infoCard">
+        <h1 id="title"></h1>
+        <p id="status"></p>
+        <p id="details"></p>
+        <p id="links"></p>
+      </div>
+    </div>
+    <div id="unrecognized">Unrecognized QR</div>
+  </div>
+
+  <!-- jsQR library -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script>
+    // 1) Configure your specific QR content here (EXACT STRING MATCH).
+    // Replace the key "CP-AM-CAM-V2" with your QR's text payload.
+    const INFO_BY_QR = {
+      "CP-AM-CAM-V2": {
+        title: "Camera Station V2",
+        status: "Status: OK · Next service: Dec 2025",
+        details: "Mounted in Line A / Bay 3. Resolution 4K, 12mm lens. Operator: Team Bravo.",
+        links: [
+          { label: "Manual (PDF)", url: "https://h10032.www1.hp.com/ctg/Manual/c04491263.pdf" },
+          { label: "Training Video", url: "https://www.youtube.com/watch?v=7q-3_gKdreo" }
+        ]
+      }
+    };
+
+    const ACCEPT_KEYS = Object.keys(INFO_BY_QR);
+
+    // 2) Setup camera
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const infoCard = document.getElementById('infoCard');
+    const titleEl = document.getElementById('title');
+    const statusEl = document.getElementById('status');
+    const detailsEl = document.getElementById('details');
+    const linksEl = document.getElementById('links');
+    const box = document.getElementById('box');
+    const unrec = document.getElementById('unrecognized');
+
+    async function init() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          canvas.width = video.videoWidth || 1280;
+          canvas.height = video.videoHeight || 720;
+          requestAnimationFrame(scan);
+        };
+      } catch (e) {
+        document.body.innerHTML = "<p style='padding:20px;color:white'>Camera access denied or unsupported.<br/>" + e + "</p>";
+      }
+    }
+
+    function drawBox(loc) {
+      const vw = video.clientWidth, vh = video.clientHeight;
+      const rx = vw / canvas.width, ry = vh / canvas.height;
+      const xs = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomRightCorner.x, loc.bottomLeftCorner.x];
+      const ys = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomRightCorner.y, loc.bottomLeftCorner.y];
+      const minx = Math.min(...xs) * rx, maxx = Math.max(...xs) * rx;
+      const miny = Math.min(...ys) * ry, maxy = Math.max(...ys) * ry;
+      box.style.left = minx + "px"; box.style.top = miny + "px";
+      box.style.width = (maxx-minx) + "px"; box.style.height = (maxy-miny) + "px";
+      box.style.display = "block";
+    }
+
+    let lastSeen = 0;
+    let locked = false; // show card and stop scanning for a bit
+
+    function showInfoFor(qrText) {
+      const info = INFO_BY_QR[qrText];
+      if (!info) return;
+      titleEl.textContent = info.title || qrText;
+      statusEl.textContent = info.status || "";
+      detailsEl.textContent = info.details || "";
+      linksEl.innerHTML = (info.links || []).map(l => `<a target="_blank" rel="noopener" href="${l.url}">${l.label}</a>`).join(" · ");
+      infoCard.style.display = "block";
+      unrec.style.display = "none";
+      locked = true;
+      // auto-unlock after 8s so you can scan again if needed
+      setTimeout(() => locked = false, 8000);
+    }
+
+    function showUnrecognized() {
+      infoCard.style.display = "none";
+      unrec.style.display = "block";
+    }
+
+    function hideOverlays() {
+      box.style.display = "none";
+      if (!locked) infoCard.style.display = "none";
+      unrec.style.display = "none";
+    }
+
+    function scan() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qr = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+        if (!locked && qr) {
+          lastSeen = performance.now();
+          drawBox(qr.location);
+          const text = qr.data.trim();
+          if (ACCEPT_KEYS.includes(text)) {
+            showInfoFor(text);
+          } else {
+            showUnrecognized();
+          }
+        } else {
+          if (performance.now() - lastSeen > 1000) hideOverlays();
+        }
+      }
+      requestAnimationFrame(scan);
+    }
+
+    init();
+  </script>
+</body>
+</html>
