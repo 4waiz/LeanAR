@@ -1,156 +1,159 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
-  <title>Specific QR → Info</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interactive Media Demo</title>
   <style>
-    html, body { margin:0; height:100%; background:#000; color:#fff; font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    #wrap { position:relative; width:100%; height:100%; overflow:hidden; }
-    #video { position:absolute; width:100%; height:100%; object-fit:cover; transform: scaleX(-1); } /* selfie mirror */
-    #canvas { display:none; }
-    #hud { position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:center; pointer-events:none; padding:24px; background: linear-gradient(180deg, rgba(0,0,0,0) 58%, rgba(0,0,0,0.35) 100%); }
-    #infoCard {
-      display:none;
-      pointer-events:auto;
-      backdrop-filter: blur(6px);
-      background: rgba(0,0,0,0.6);
-      padding: 16px 18px; border-radius: 14px; width:min(680px,92vw);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    :root {
+      --bg: #0f172a;         /* slate-900 */
+      --panel: #111827;      /* gray-900 */
+      --text: #e5e7eb;       /* gray-200 */
+      --accent: #60a5fa;     /* blue-400 */
+      --muted: #9ca3af;      /* gray-400 */
     }
-    #infoCard h1 { margin:0 0 6px; font-size:20px; }
-    #infoCard p  { margin:6px 0; font-size:16px; opacity:0.95; }
-    #infoCard a  { color:#8fd3ff; text-decoration:underline; }
-    #hint { position:absolute; top:12px; left:12px; right:12px; text-align:center; opacity:.85; font-size:14px; background: rgba(0,0,0,.35); padding:8px 10px; border-radius:12px; }
-    #box { position:absolute; border:3px solid #4af; border-radius:8px; display:none; }
-    #unrecognized { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); font-size:14px; opacity:0.85; display:none; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: linear-gradient(180deg, var(--bg), #0b1025 40%, #0a0f22);
+      color: var(--text); min-height: 100svh; display: grid; place-items: center;
+      padding: 2rem;
+    }
+    .card {
+      width: min(720px, 100%); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 1rem; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,.35); backdrop-filter: blur(6px);
+    }
+    h1 { margin: 0 0 .75rem; font-size: clamp(1.3rem, 2.5vw + .6rem, 2rem); }
+    p  { margin: 0 0 1.25rem; color: var(--muted) }
+    .row { display: flex; flex-wrap: wrap; gap: .75rem; }
+    button {
+      appearance: none; border: 1px solid rgba(255,255,255,0.16);
+      background: linear-gradient(180deg, #1f2937, #111827); color: var(--text);
+      padding: .65rem 1rem; border-radius: .75rem; cursor: pointer; font-weight: 600;
+      transition: transform .06s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    button:hover { border-color: rgba(96,165,250,.6); box-shadow: 0 4px 18px rgba(96,165,250,.2); }
+    button:active { transform: translateY(1px) scale(.995); }
+    .video-wrap {
+      margin-top: 1rem; display: none; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: .75rem; overflow: hidden; background: #000;
+    }
+    .video-wrap.active { display: block; }
+    video { width: 100%; height: auto; display: block; background: #000; }
+
+    /* Modal (uses <dialog>) */
+    dialog {
+      border: none; padding: 0; border-radius: .75rem; overflow: hidden; background: var(--panel);
+      color: var(--text); box-shadow: 0 25px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08);
+      max-width: min(420px, 95vw);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.55); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: .75rem 1rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .modal-body { padding: .75rem; background: #0b1226; }
+    .modal-body img { max-width: 100%; height: auto; display: block; border-radius: .5rem; }
+    .icon-btn {
+      background: transparent; border: 1px solid rgba(255,255,255,.18); width: 36px; height: 36px; border-radius: .6rem;
+      display: grid; place-items: center; font-size: 0; line-height: 0;
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+    .hint { margin-top: .65rem; font-size: .875rem; color: var(--muted); }
+    a.inline { color: var(--accent); }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <video id="video" playsinline autoplay muted></video>
-    <canvas id="canvas"></canvas>
-    <div id="box"></div>
-    <div id="hint">Point your camera at the specific QR code</div>
-    <div id="hud">
-      <div id="infoCard">
-        <h1 id="title"></h1>
-        <p id="status"></p>
-        <p id="details"></p>
-        <p id="links"></p>
-      </div>
+  <main class="card">
+    <h1>Interactive Media</h1>
+    <p>Use the buttons to play a video in-page or open a small window that displays an image.</p>
+
+    <div class="row" role="group" aria-label="Media actions">
+      <button id="toggleVideo" type="button" aria-expanded="false" aria-controls="videoRegion">
+        ▶️ Play video
+      </button>
+
+      <button id="openImage" type="button">
+        🖼️ Show image
+      </button>
     </div>
-    <div id="unrecognized">Unrecognized QR</div>
-  </div>
 
-  <!-- jsQR library -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <div id="videoRegion" class="video-wrap" aria-live="polite">
+      <!-- Place video.mp4 next to this HTML file -->
+      <video id="videoEl" controls preload="metadata" playsinline>
+        <source src="video.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
+
+    <p class="hint">
+      Files expected next to this page: <code>video.mp4</code> and <code>image.png</code>.
+      Can’t see them? <a class="inline" href="image.png" target="_blank" rel="noopener">Open image directly</a>.
+    </p>
+  </main>
+
+  <!-- Image Modal -->
+  <dialog id="imgModal" aria-labelledby="imgTitle">
+    <div class="modal-header">
+      <strong id="imgTitle">Image preview</strong>
+      <button class="icon-btn" id="closeModal" type="button" aria-label="Close image">
+        ✕
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Place image.png next to this HTML file -->
+      <img src="image.png" alt="Preview of image.png" loading="lazy">
+    </div>
+  </dialog>
+
   <script>
-    // 1) Configure your specific QR content here (EXACT STRING MATCH).
-    // Replace the key "CP-AM-CAM-V2" with your QR's text payload.
-    const INFO_BY_QR = {
-      "CP-AM-CAM-V2": {
-        title: "Camera Station V2",
-        status: "Status: OK · Next service: Dec 2025",
-        details: "Mounted in Line A / Bay 3. Resolution 4K, 12mm lens. Operator: Team Bravo.",
-        links: [
-          { label: "Manual (PDF)", url: "https://h10032.www1.hp.com/ctg/Manual/c04491263.pdf" },
-          { label: "Training Video", url: "https://www.youtube.com/watch?v=7q-3_gKdreo" }
-        ]
-      }
-    };
+    // Inline video toggle
+    const toggleBtn = document.getElementById('toggleVideo');
+    const videoRegion = document.getElementById('videoRegion');
+    const videoEl = document.getElementById('videoEl');
 
-    const ACCEPT_KEYS = Object.keys(INFO_BY_QR);
-
-    // 2) Setup camera
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const infoCard = document.getElementById('infoCard');
-    const titleEl = document.getElementById('title');
-    const statusEl = document.getElementById('status');
-    const detailsEl = document.getElementById('details');
-    const linksEl = document.getElementById('links');
-    const box = document.getElementById('box');
-    const unrec = document.getElementById('unrecognized');
-
-    async function init() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          video.play();
-          canvas.width = video.videoWidth || 1280;
-          canvas.height = video.videoHeight || 720;
-          requestAnimationFrame(scan);
-        };
-      } catch (e) {
-        document.body.innerHTML = "<p style='padding:20px;color:white'>Camera access denied or unsupported.<br/>" + e + "</p>";
+    function toggleVideo() {
+      const isActive = videoRegion.classList.toggle('active');
+      toggleBtn.setAttribute('aria-expanded', String(isActive));
+      toggleBtn.textContent = isActive ? '⏹️ Hide video' : '▶️ Play video';
+      if (isActive) {
+        // Start playback when shown (autoplay policies may block without user gesture—this is tied to a click)
+        videoEl.play().catch(() => {/* ignored if blocked */});
+        // Scroll into view on small screens
+        videoRegion.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        videoEl.pause();
       }
     }
+    toggleBtn.addEventListener('click', toggleVideo);
 
-    function drawBox(loc) {
-      const vw = video.clientWidth, vh = video.clientHeight;
-      const rx = vw / canvas.width, ry = vh / canvas.height;
-      const xs = [loc.topLeftCorner.x, loc.topRightCorner.x, loc.bottomRightCorner.x, loc.bottomLeftCorner.x];
-      const ys = [loc.topLeftCorner.y, loc.topRightCorner.y, loc.bottomRightCorner.y, loc.bottomLeftCorner.y];
-      const minx = Math.min(...xs) * rx, maxx = Math.max(...xs) * rx;
-      const miny = Math.min(...ys) * ry, maxy = Math.max(...ys) * ry;
-      box.style.left = minx + "px"; box.style.top = miny + "px";
-      box.style.width = (maxx-minx) + "px"; box.style.height = (maxy-miny) + "px";
-      box.style.display = "block";
-    }
+    // Image modal using <dialog>
+    const modal = document.getElementById('imgModal');
+    const openImage = document.getElementById('openImage');
+    const closeModal = document.getElementById('closeModal');
 
-    let lastSeen = 0;
-    let locked = false; // show card and stop scanning for a bit
-
-    function showInfoFor(qrText) {
-      const info = INFO_BY_QR[qrText];
-      if (!info) return;
-      titleEl.textContent = info.title || qrText;
-      statusEl.textContent = info.status || "";
-      detailsEl.textContent = info.details || "";
-      linksEl.innerHTML = (info.links || []).map(l => `<a target="_blank" rel="noopener" href="${l.url}">${l.label}</a>`).join(" · ");
-      infoCard.style.display = "block";
-      unrec.style.display = "none";
-      locked = true;
-      // auto-unlock after 8s so you can scan again if needed
-      setTimeout(() => locked = false, 8000);
-    }
-
-    function showUnrecognized() {
-      infoCard.style.display = "none";
-      unrec.style.display = "block";
-    }
-
-    function hideOverlays() {
-      box.style.display = "none";
-      if (!locked) infoCard.style.display = "none";
-      unrec.style.display = "none";
-    }
-
-    function scan() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qr = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
-        if (!locked && qr) {
-          lastSeen = performance.now();
-          drawBox(qr.location);
-          const text = qr.data.trim();
-          if (ACCEPT_KEYS.includes(text)) {
-            showInfoFor(text);
-          } else {
-            showUnrecognized();
-          }
-        } else {
-          if (performance.now() - lastSeen > 1000) hideOverlays();
-        }
+    openImage.addEventListener('click', () => {
+      if (typeof modal.showModal === 'function') {
+        modal.showModal();
+        // focus close button for accessibility
+        closeModal.focus();
+      } else {
+        // Fallback: open image in a new tab if dialog not supported
+        window.open('image.png', '_blank', 'noopener');
       }
-      requestAnimationFrame(scan);
-    }
+    });
 
-    init();
+    function hideModal() { if (modal.open) modal.close(); }
+    closeModal.addEventListener('click', hideModal);
+    modal.addEventListener('cancel', (e) => { e.preventDefault(); hideModal(); }); // Esc key
+    modal.addEventListener('click', (e) => {
+      // click outside the panel closes modal
+      const rect = modal.getBoundingClientRect();
+      const inDialog = (
+        e.clientX >= rect.left && e.clientX <= rect.right &&
+        e.clientY >= rect.top && e.clientY <= rect.bottom
+      );
+      if (!inDialog) hideModal();
+    });
   </script>
 </body>
 </html>
