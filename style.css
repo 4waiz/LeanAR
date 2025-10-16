@@ -12,14 +12,21 @@ body {
 
 #container {
     background: white;
-    padding: 1.5rem;
+    padding: 1.5rem 2rem; /* Increased horizontal padding slightly */
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     width: 100%; max-width: 600px;
     text-align: center;
 }
 
-h1 { margin-top: 0; font-size: 1.75rem; color: #0056b3; }
+/* === NEW: LOGO STYLES === */
+.header-logo {
+    max-width: 250px; /* Adjust size as needed */
+    margin-bottom: 1.5rem; /* Space between logo and title */
+}
+
+h1 { margin-top: 0; font-size: 1.75rem; color: #333; } /* Changed color to match logo */
+p { color: #666; }
 
 #video-container {
     position: relative;
@@ -45,7 +52,7 @@ h1 { margin-top: 0; font-size: 1.75rem; color: #0056b3; }
     background-color: #e9ecef;
     border-radius: 8px;
     font-weight: 500;
-    transition: all 0.3s ease; /* Smooth transition for color changes */
+    transition: all 0.3s ease;
 }
 
 /* --- Loader and Helper Classes --- */
@@ -53,7 +60,7 @@ h1 { margin-top: 0; font-size: 1.75rem; color: #0056b3; }
     position: absolute; top: 50%; left: 50%;
     width: 50px; height: 50px;
     border: 5px solid #f3f3f3;
-    border-top: 5px solid #0056b3;
+    border-top: 5px solid #E4572E; /* Changed to match logo's orange */
     border-radius: 50%;
     transform: translate(-50%, -50%);
     animation: spin 1s linear infinite;
@@ -66,5 +73,6 @@ h1 { margin-top: 0; font-size: 1.75rem; color: #0056b3; }
 @media (max-width: 480px) {
     body { padding: 0.5rem; }
     #container { padding: 1rem; }
+    .header-logo { max-width: 200px; margin-bottom: 1rem; }
     h1 { font-size: 1.5rem; }
 }
