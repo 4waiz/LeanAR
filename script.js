@@ -93,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (err) {
             console.error("Camera initialization failed:", err);
-            // Provide specific error messages to the user
             if (err.name === 'NotAllowedError') {
                 updateStatus("Error: Camera access was denied. Please enable camera permissions in your browser settings and refresh.", true);
             } else if (err.name === 'NotFoundError') {
