@@ -26,7 +26,6 @@ h1 {
     color: #0056b3;
 }
 
-/* This container holds both the video and the 3D model canvas */
 #video-container {
     position: relative;
     width: 100%;
