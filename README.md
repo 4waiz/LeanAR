@@ -1,3 +1,4 @@
+
 # 🔍📱 ScanAR
 
 Turn any **QR code** into an **instant AR info panel** on your iPhone.  
