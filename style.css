@@ -145,7 +145,6 @@ p {
   }
 }
 
-
 /* Force A-Frame canvas to be transparent when overlaid */
 #model-container canvas { background: transparent !important; }
 #model-container a-scene { background: transparent !important; }
