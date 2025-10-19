@@ -1,10 +1,11 @@
+
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Adds: "lost tracking" handling — if the QR disappears for 2s, overlay is removed.
-// IDs:
-//   ID-1 -> GLTF Astronaut (3D)
-//   ID-2 -> GLTF Duck (3D)
-//   ID-3 -> 3D Apple (A-Frame primitives)
-//   ID-4 -> 2D Duck (SVG overlay)
+// Overlays are lightweight & local (no external GLTF) for speed & iOS compatibility.
+// - ID-1: EDGE Ring (torus-knot, spinning)
+// - ID-2: UFO (bobbing saucer, lights)
+// - ID-3: Apple (primitives)
+// - ID-4: 2D Duck (SVG)
+// Also: removes overlay if code not seen for 2s; throttled jsQR and downscaled frames for speed.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -14,11 +15,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('loader');
   const startBtn = document.getElementById('start-btn');
 
-  // Tracking state
+  // Tuning
+  const LOST_TIMEOUT_MS = 2000;       // clear overlay if not seen for this long
+  const JSQR_TARGET_W = 480;          // downscale width for jsQR speed
+  const SCAN_MIN_INTERVAL = 60;       // min ms between scans (~16=60fps; 60=~16fps)
+
+  // State
   let scanning = false;
-  let activeId = null;         // the last seen QR text (recognized or not)
-  let lastSeenAt = 0;          // performance.now() timestamp of the last time we saw activeId
-  const LOST_TIMEOUT_MS = 2000;
+  let activeId = null;
+  let lastSeenAt = 0;
+  let lastScanAt = 0;
 
   // Camera / detection state
   let streamRef = null;
@@ -33,62 +39,64 @@ document.addEventListener('DOMContentLoaded', () => {
     scanResultDiv.style.color = isError ? '#D8000C' : '#0d47a1';
   }
 
-  // Overlay definitions
+  // Overlay builders (no GLTF, all local)
   const overlays = {
-    'ID-1': {
-      mode: 'gltf',
-      name: 'Astronaut',
-      url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/astronaut.glb?v=1680320790145',
-      scale: '0.8 0.8 0.8',
-      animation: 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;'
-    },
-    'ID-2': {
-      mode: 'gltf',
-      name: 'Rubber Duck (3D)',
-      url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/duck.glb?v=1680320791438',
-      scale: '0.01 0.01 0.01',
-      animation: 'property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;'
-    },
-    'ID-3': { mode: 'apple3d', name: '3D Apple' },
-    'ID-4': { mode: 'duck2d',  name: '2D Duck'  }
+    'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
+    'ID-2': { mode: 'ufo3d',    name: 'UFO' },
+    'ID-3': { mode: 'apple3d',  name: '3D Apple' },
+    'ID-4': { mode: 'duck2d',   name: '2D Duck' },
   };
+
+  function sceneWrap(inner) {
+    return `
+      <a-scene embedded renderer="alpha: true; antialias: true" background="color: #0000" vr-mode-ui="enabled: false">
+        ${inner}
+        <a-light type="ambient" intensity="1"></a-light>
+        <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
+        <a-camera wasd-controls-enabled="false" look-controls="enabled: false" position="0 0.5 2"></a-camera>
+      </a-scene>
+    `;
+  }
 
   function showOverlay(def) {
     modelContainer.innerHTML = '';
 
-    if (def.mode === 'gltf') {
-      modelContainer.innerHTML = `
-        <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
-          <a-assets><a-asset-item id="mdl" src="${def.url}"></a-asset-item></a-assets>
-          <a-entity id="model-entity" gltf-model="#mdl" scale="${def.scale}" position="0 0 -2.5"
-                    animation="${def.animation}"></a-entity>
-          <a-light type="ambient" intensity="0.8"></a-light>
-          <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
-          <a-sky color="transparent" material="opacity: 0"></a-sky>
-          <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
-        </a-scene>`;
-      const entity = modelContainer.querySelector('#model-entity');
-      if (entity) {
-        loader.classList.remove('hidden');
-        entity.addEventListener('model-loaded', () => loader.classList.add('hidden'));
-      }
+    if (def.mode === 'edgeRing') {
+      const inner = `
+        <a-entity position="0 0 -2.5" animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear">
+          <a-torus-knot p="2" q="3" radius="0.9" radius-tubular="0.08"
+                        material="color: #00d1b2; metalness: 0.4; roughness: 0.3"></a-torus-knot>
+        </a-entity>`;
+      modelContainer.innerHTML = sceneWrap(inner);
+      return;
+    }
+
+    if (def.mode === 'ufo3d') {
+      const inner = `
+        <a-entity position="0 0 -2.5" animation="property: position; to: 0 0.2 -2.5; dir: alternate; loop: true; dur: 1500">
+          <a-cylinder height="0.18" radius="0.9" color="#8e9eab"
+                      material="metalness:0.6; roughness:0.2"></a-cylinder>
+          <a-sphere radius="0.5" position="0 0.35 0" color="#cfd8dc"
+                    material="metalness:0.1; roughness:0.9"></a-sphere>
+          <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85"
+                  material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
+          <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
+          <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
+          <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
+          <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
+        </a-entity>`;
+      modelContainer.innerHTML = sceneWrap(inner);
       return;
     }
 
     if (def.mode === 'apple3d') {
-      modelContainer.innerHTML = `
-        <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
-          <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f">
-            <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
-          </a-sphere>
-          <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
-          <a-plane position="0.12 0.8 -2.2" rotation="0 0 35" width="0.35" height="0.2" color="#43a047"
-                   material="side: double"></a-plane>
-          <a-light type="ambient" intensity="0.8"></a-light>
-          <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
-          <a-sky color="transparent" material="opacity: 0"></a-sky>
-          <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
-        </a-scene>`;
+      const inner = `
+        <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f">
+          <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
+        </a-sphere>
+        <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
+        <a-plane position="0.12 0.8 -2.2" rotation="0 0 35" width="0.35" height="0.2" color="#43a047" material="side: double"></a-plane>`;
+      modelContainer.innerHTML = sceneWrap(inner);
       return;
     }
 
@@ -174,7 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Called each frame with the detected text (if any)
   function registerDetection(text) {
     const now = performance.now();
     if (text) {
@@ -182,9 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
         activeId = text;
         handleRecognizedText(text);
       }
-      lastSeenAt = now; // refresh timer whenever we see the (possibly new) code
+      lastSeenAt = now;
     } else {
-      // nothing detected — if we had an active code and it's been > 2s, clear overlay
       if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
         activeId = null;
         lastSeenAt = 0;
@@ -198,22 +204,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!scanning) return;
 
     let detectedText = null;
-    try {
-      if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
-        if (useBarcodeDetector) {
-          const codes = await detector.detect(video);
-          if (codes && codes.length) detectedText = codes[0].rawValue || codes[0].displayValue;
-        } else {
-          if (!canvas) { canvas = document.createElement('canvas'); ctx = canvas.getContext('2d', { willReadFrequently: true }); }
-          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = window.jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' });
-          if (code && code.data) detectedText = code.data;
+    const now = performance.now();
+    if (now - lastScanAt >= SCAN_MIN_INTERVAL) {
+      lastScanAt = now;
+      try {
+        if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+          if (useBarcodeDetector) {
+            const codes = await detector.detect(video);
+            if (codes && codes.length) detectedText = codes[0].rawValue || codes[0].displayValue;
+          } else {
+            if (!canvas) { canvas = document.createElement('canvas'); ctx = canvas.getContext('2d', { willReadFrequently: true }); }
+            // Downscale frame to speed up jsQR
+            const vw = video.videoWidth, vh = video.videoHeight;
+            const scale = JSQR_TARGET_W / Math.max(1, vw);
+            canvas.width = Math.floor(vw * scale);
+            canvas.height = Math.floor(vh * scale);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = window.jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' });
+            if (code && code.data) detectedText = code.data;
+          }
         }
+      } catch (e) {
+        console.warn('scan error', e);
       }
-    } catch (e) {
-      console.warn('scan error', e);
     }
 
     registerDetection(detectedText);
