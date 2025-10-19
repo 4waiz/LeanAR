@@ -1,108 +1,135 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const modelContainer = document.getElementById('model-container');
-    const scanResultP = document.querySelector('#scan-result p');
-    const scanResultDiv = document.getElementById('scan-result');
-    const loader = document.getElementById('loader');
-    let html5QrCode;
-    let lastScannedId = null;
+  const modelContainer = document.getElementById('model-container');
+  const scanResultP = document.querySelector('#scan-result p');
+  const scanResultDiv = document.getElementById('scan-result');
+  const loader = document.getElementById('loader');
+  const startBtn = document.getElementById('start-btn');
 
-    // --- NEW: Function to update the status message on screen ---
-    function updateStatus(message, isError = false) {
-        scanResultP.textContent = message;
-        if (isError) {
-            scanResultDiv.style.backgroundColor = '#FFD2D2'; // Light red
-            scanResultDiv.style.color = '#D8000C'; // Dark red
-        } else {
-            scanResultDiv.style.backgroundColor = '#e9ecef';
-            scanResultDiv.style.color = '#333';
-        }
+  let html5QrCode = null;
+  let lastScannedId = null;
+
+  function updateStatus(message, isError = false) {
+    scanResultP.textContent = message;
+    if (isError) {
+      scanResultDiv.style.backgroundColor = '#FFD2D2';
+      scanResultDiv.style.color = '#D8000C';
+    } else {
+      scanResultDiv.style.backgroundColor = '#e9ecef';
+      scanResultDiv.style.color = '#333';
     }
+  }
 
-    const modelMapping = {
-        "ID-1": { url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/astronaut.glb?v=1680320790145', scale: '0.8 0.8 0.8', animation: 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;', name: 'Astronaut' },
-        "ID-2": { url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/duck.glb?v=1680320791438', scale: '0.01 0.01 0.01', animation: 'property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;', name: 'Rubber Duck' },
-        "ID-3": { url: 'https://cdn.glitch.global/e733880b-402a-414a-8533-9118534f3b57/robot_expressive.glb?v=1680320796328', scale: '0.5 0.5 0.5', animation: 'property: rotation; to: 0 -360 0; loop: true; dur: 10000;', name: 'Expressive Robot' },
-        "ID-4": { url: 'https://cdn.glitch.global/e733880b-402a-414a-8533-9118534f3b57/helmet.glb?v=1680320793139', scale: '1.2 1.2 1.2', animation: 'property: rotation; to: 360 360 0; loop: true; dur: 20000;', name: 'Sci-Fi Helmet' }
-    };
-
-    function onScanSuccess(decodedText) {
-        if (decodedText !== lastScannedId) {
-            lastScannedId = decodedText;
-            const modelData = modelMapping[decodedText];
-            if (modelData) {
-                updateStatus(`Success! Loading ${modelData.name}...`);
-                loader.classList.remove('hidden');
-                displayModel(modelData);
-            } else {
-                updateStatus(`QR Code "${decodedText}" is not recognized.`);
-                hideModel();
-            }
-        }
+  // Map payloads -> models (same IDs you requested)
+  const modelMapping = {
+    "ID-1": {
+      url: "https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/astronaut.glb?v=1680320790145",
+      scale: "0.8 0.8 0.8",
+      animation: "property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;",
+      name: "Astronaut"
+    },
+    "ID-2": {
+      url: "https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/duck.glb?v=1680320791438",
+      scale: "0.01 0.01 0.01",
+      animation: "property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;",
+      name: "Rubber Duck"
     }
+    // You can add more: "ID-3": {...}, "ID-4": {...}
+  };
 
-    function onScanFailure(error) {
-        if (lastScannedId) {
-            updateStatus('No QR Code in view. Ready to scan...');
-            hideModel();
-            lastScannedId = null;
-        }
-    }
+  function showOverlay(modelData) {
+    // Transparent scene over the camera (no sky, alpha renderer)
+    modelContainer.innerHTML = `
+      <a-scene embedded
+               renderer="alpha: true; antialias: true;"
+               vr-mode-ui="enabled: false">
+        <a-assets>
+          <a-asset-item id="model" src="${modelData.url}"></a-asset-item>
+        </a-assets>
 
-    function displayModel(modelData) {
-        modelContainer.style.display = 'block';
-        modelContainer.innerHTML = `
-            <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
-                <a-assets><a-asset-item id="model" src="${modelData.url}"></a-asset-item></a-assets>
-                <a-entity id="model-entity" gltf-model="#model" scale="${modelData.scale}" position="0 0 -2.5" animation="${modelData.animation}"></a-entity>
-                <a-light type="ambient" color="#FFF" intensity="0.7"></a-light>
-                <a-light type="directional" color="#FFF" intensity="0.5" position="-1 1 2"></a-light>
-                <a-sky color="transparent" opacity="0"></a-sky>
-                <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false" mouse-cursor></a-camera>
-            </a-scene>
-        `;
-        const modelEntity = document.querySelector('#model-entity');
-        modelEntity.addEventListener('model-loaded', () => loader.classList.add('hidden'));
-    }
+        <a-entity id="model-entity"
+                  gltf-model="#model"
+                  scale="${modelData.scale}"
+                  position="0 0 -2.5"
+                  animation="${modelData.animation}">
+        </a-entity>
 
-    function hideModel() {
-        modelContainer.style.display = 'none';
-        modelContainer.innerHTML = '';
+        <a-light type="ambient" intensity="0.8"></a-light>
+        <a-light type="directional" intensity="0.6" position="-1 1 2"></a-light>
+
+        <a-sky color="transparent" material="opacity: 0"></a-sky>
+        <a-camera position="0 0.5 2" look-controls="enabled: true"
+                  wasd-controls-enabled="false"></a-camera>
+      </a-scene>
+    `;
+
+    const entity = document.getElementById('model-entity');
+    if (entity) {
+      loader.classList.remove('hidden');
+      entity.addEventListener('model-loaded', () => {
         loader.classList.add('hidden');
+      });
     }
+  }
 
-    // --- Main Function to Start the Scanner ---
-    async function startScanner() {
-        updateStatus("Initializing scanner...");
-        html5QrCode = new Html5Qrcode("qr-reader");
+  function clearOverlay() {
+    modelContainer.innerHTML = '';
+    loader.classList.add('hidden');
+  }
 
-        try {
-            // Check for available cameras first
-            const cameras = await Html5Qrcode.getCameras();
-            if (!cameras || cameras.length === 0) {
-                throw new Error("No cameras found on this device.");
-            }
+  function onScanSuccess(decodedText) {
+    // Only react to changes and only for known IDs
+    if (decodedText !== lastScannedId) {
+      lastScannedId = decodedText;
+      const modelData = modelMapping[decodedText];
 
-            const qrboxFunction = (w, h) => ({ width: Math.floor(Math.min(w, h) * 0.7), height: Math.floor(Math.min(w, h) * 0.7) });
-            const config = { fps: 10, qrbox: qrboxFunction };
-
-            updateStatus("Starting camera... Please grant permission.");
-            
-            await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure);
-            
-            updateStatus("Ready to scan...");
-
-        } catch (err) {
-            console.error("Camera initialization failed:", err);
-            if (err.name === 'NotAllowedError') {
-                updateStatus("Error: Camera access was denied. Please enable camera permissions in your browser settings and refresh.", true);
-            } else if (err.name === 'NotFoundError') {
-                updateStatus("Error: No camera was found on this device.", true);
-            } else {
-                updateStatus(`Error: Could not start camera. ${err.message}`, true);
-            }
-        }
+      if (modelData) {
+        updateStatus(`Success! Loading ${modelData.name}...`);
+        showOverlay(modelData);
+      } else {
+        updateStatus(`QR "${decodedText}" not recognized. Expect ID-1 or ID-2.`);
+        clearOverlay();
+      }
     }
+  }
 
-    // Run the main function
-    startScanner();
+  function onScanFailure() {
+    // Keep scanning silently; when nothing is seen, we don't spam messages
+  }
+
+  async function startScanner() {
+    try {
+      updateStatus("Initializing scanner...");
+      html5QrCode = new Html5Qrcode("qr-reader");
+
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) {
+        throw new Error("No cameras found on this device.");
+      }
+
+      const qrbox = (w, h) => {
+        const s = Math.floor(Math.min(w, h) * 0.7);
+        return { width: s, height: s };
+      };
+      const config = { fps: 10, qrbox };
+
+      updateStatus("Starting camera... please allow permission.");
+      await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure);
+      updateStatus("Ready. Point the camera at a QR code containing ID-1 or ID-2.");
+      startBtn.style.display = 'none'; // hide once started
+    } catch (err) {
+      console.error("Camera initialization failed:", err);
+      if (err?.name === 'NotAllowedError') {
+        updateStatus("Camera access denied. Enable camera in browser settings and retry.", true);
+      } else if (err?.name === 'NotFoundError') {
+        updateStatus("No camera found on this device.", true);
+      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        updateStatus("This must be served over HTTPS or localhost for camera access.", true);
+      } else {
+        updateStatus(`Could not start camera: ${err?.message || err}`, true);
+      }
+    }
+  }
+
+  // Require a tap (better iOS support)
+  startBtn.addEventListener('click', startScanner);
 });
