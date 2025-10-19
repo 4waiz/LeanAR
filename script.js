@@ -1,9 +1,10 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// ID-1 -> GLTF Astronaut (3D)
-// ID-2 -> GLTF Duck (3D)
-// ID-3 -> 3D Apple (A-Frame primitives, no external assets)
-// ID-4 -> 2D Duck (SVG overlay)
-// Works on HTTPS or localhost. Click 'Start Scanner' to begin.
+// Adds: "lost tracking" handling — if the QR disappears for 2s, overlay is removed.
+// IDs:
+//   ID-1 -> GLTF Astronaut (3D)
+//   ID-2 -> GLTF Duck (3D)
+//   ID-3 -> 3D Apple (A-Frame primitives)
+//   ID-4 -> 2D Duck (SVG overlay)
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -13,8 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('loader');
   const startBtn = document.getElementById('start-btn');
 
+  // Tracking state
   let scanning = false;
-  let lastText = null;
+  let activeId = null;         // the last seen QR text (recognized or not)
+  let lastSeenAt = 0;          // performance.now() timestamp of the last time we saw activeId
+  const LOST_TIMEOUT_MS = 2000;
+
+  // Camera / detection state
   let streamRef = null;
   let useBarcodeDetector = false;
   let detector = null;
@@ -23,13 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateStatus(message, isError = false) {
     scanResultP.textContent = message;
-    if (isError) {
-      scanResultDiv.style.backgroundColor = '#FFD2D2';
-      scanResultDiv.style.color = '#D8000C';
-    } else {
-      scanResultDiv.style.backgroundColor = '#e9ecef';
-      scanResultDiv.style.color = '#333';
-    }
+    scanResultDiv.style.backgroundColor = isError ? '#FFD2D2' : '#e3f2fd';
+    scanResultDiv.style.color = isError ? '#D8000C' : '#0d47a1';
   }
 
   // Overlay definitions
@@ -48,34 +49,24 @@ document.addEventListener('DOMContentLoaded', () => {
       scale: '0.01 0.01 0.01',
       animation: 'property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;'
     },
-    'ID-3': {
-      mode: 'apple3d',
-      name: '3D Apple'
-    },
-    'ID-4': {
-      mode: 'duck2d',
-      name: '2D Duck'
-    }
+    'ID-3': { mode: 'apple3d', name: '3D Apple' },
+    'ID-4': { mode: 'duck2d',  name: '2D Duck'  }
   };
 
   function showOverlay(def) {
-    // Clean previous content
     modelContainer.innerHTML = '';
 
     if (def.mode === 'gltf') {
       modelContainer.innerHTML = `
         <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
-          <a-assets>
-            <a-asset-item id="mdl" src="${def.url}"></a-asset-item>
-          </a-assets>
+          <a-assets><a-asset-item id="mdl" src="${def.url}"></a-asset-item></a-assets>
           <a-entity id="model-entity" gltf-model="#mdl" scale="${def.scale}" position="0 0 -2.5"
                     animation="${def.animation}"></a-entity>
           <a-light type="ambient" intensity="0.8"></a-light>
           <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
           <a-sky color="transparent" material="opacity: 0"></a-sky>
           <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
-        </a-scene>
-      `;
+        </a-scene>`;
       const entity = modelContainer.querySelector('#model-entity');
       if (entity) {
         loader.classList.remove('hidden');
@@ -85,32 +76,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (def.mode === 'apple3d') {
-      // Build a simple apple with A-Frame primitives: sphere + stem + leaf
       modelContainer.innerHTML = `
         <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
-          <!-- Apple body -->
           <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f">
             <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
           </a-sphere>
-
-          <!-- Stem -->
           <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
-
-          <!-- Leaf -->
           <a-plane position="0.12 0.8 -2.2" rotation="0 0 35" width="0.35" height="0.2" color="#43a047"
                    material="side: double"></a-plane>
-
           <a-light type="ambient" intensity="0.8"></a-light>
           <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
           <a-sky color="transparent" material="opacity: 0"></a-sky>
           <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
-        </a-scene>
-      `;
+        </a-scene>`;
       return;
     }
 
     if (def.mode === 'duck2d') {
-      // Simple centered SVG duck with bobbing animation
       const wrapper = document.createElement('div');
       wrapper.className = 'overlay-2d center-bob';
       wrapper.innerHTML = `
@@ -123,8 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <circle cx="48" cy="44" r="3" fill="#263238"></circle>
             <path d="M92 40 q20 12 0 24" fill="#81c784" stroke="#388e3c" stroke-width="2"></path>
           </g>
-        </svg>
-      `;
+        </svg>`;
       modelContainer.appendChild(wrapper);
       return;
     }
@@ -144,9 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
       s.onerror = () => reject(new Error('Failed to load jsQR fallback'));
       document.head.appendChild(s);
     });
-    if (!window.jsQR) {
-      throw new Error('jsQR failed to load');
-    }
+    if (!window.jsQR) throw new Error('jsQR failed to load');
   }
 
   async function setupDetector() {
@@ -169,11 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function startCamera() {
     const constraints = {
       audio: false,
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
     };
     streamRef = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = streamRef;
@@ -183,16 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function stopCamera() {
     if (rafId) cancelAnimationFrame(rafId);
-    if (streamRef) {
-      streamRef.getTracks().forEach(t => t.stop());
-      streamRef = null;
-    }
+    if (streamRef) { streamRef.getTracks().forEach(t => t.stop()); streamRef = null; }
     scanning = false;
+    activeId = null;
   }
 
-  function handleText(text) {
-    if (!text || text === lastText) return;
-    lastText = text;
+  function handleRecognizedText(text) {
     const def = overlays[text];
     if (def) {
       updateStatus(`Success! Overlay: ${def.name}`);
@@ -203,36 +174,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Called each frame with the detected text (if any)
+  function registerDetection(text) {
+    const now = performance.now();
+    if (text) {
+      if (text !== activeId) {
+        activeId = text;
+        handleRecognizedText(text);
+      }
+      lastSeenAt = now; // refresh timer whenever we see the (possibly new) code
+    } else {
+      // nothing detected — if we had an active code and it's been > 2s, clear overlay
+      if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
+        activeId = null;
+        lastSeenAt = 0;
+        clearOverlay();
+        updateStatus('Lost QR. Searching…');
+      }
+    }
+  }
+
   async function scanLoop() {
     if (!scanning) return;
 
+    let detectedText = null;
     try {
       if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
         if (useBarcodeDetector) {
           const codes = await detector.detect(video);
-          if (codes && codes.length) {
-            const text = codes[0].rawValue || codes[0].displayValue;
-            handleText(text);
-          }
+          if (codes && codes.length) detectedText = codes[0].rawValue || codes[0].displayValue;
         } else {
-          if (!canvas) {
-            canvas = document.createElement('canvas');
-            ctx = canvas.getContext('2d', { willReadFrequently: true });
-          }
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
+          if (!canvas) { canvas = document.createElement('canvas'); ctx = canvas.getContext('2d', { willReadFrequently: true }); }
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const code = window.jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' });
-          if (code && code.data) {
-            handleText(code.data);
-          }
+          if (code && code.data) detectedText = code.data;
         }
       }
     } catch (e) {
       console.warn('scan error', e);
     }
 
+    registerDetection(detectedText);
     rafId = requestAnimationFrame(scanLoop);
   }
 
@@ -250,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       scanning = true;
       startBtn.style.display = 'none';
-      updateStatus('Ready. Point the camera at a QR code containing ID-1 / ID-2 / ID-3 / ID-4.');
+      updateStatus('Ready. Scan ID-1 / ID-2 / ID-3 / ID-4.');
       scanLoop();
     } catch (err) {
       console.error('Initialization failed:', err);
@@ -267,7 +251,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   startBtn.addEventListener('click', startScanner);
-
-  // Cleanup on unload
   window.addEventListener('beforeunload', stopCamera);
 });
