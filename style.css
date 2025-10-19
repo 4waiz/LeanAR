@@ -13,18 +13,18 @@ body {
 #container {
   background: #fff; padding: 1.5rem 2rem;
   border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.1);
-  width: 100%; max-width: 600px; text-align: center;
+  width: 100%; max-width: 640px; text-align: center;
 }
 
 .header-logo { max-width: 250px; margin-bottom: 1.5rem; }
-h1 { margin-top: 0; font-size: 1.75rem; color: #333; }
-p { color: #666; }
+h1 { margin-top: 0; font-size: 1.75rem; color: #0a2b33; }
+p { color: #3a5b63; }
 
 /* Video container */
 #video-container {
   position: relative;
   width: 100%; padding-top: 100%; /* square */
-  border-radius: 8px; overflow: hidden; background: #222; margin: 1rem 0;
+  border-radius: 12px; overflow: hidden; background: #0f2027; margin: 1rem 0;
 }
 
 /* camera layer */
@@ -40,18 +40,33 @@ p { color: #666; }
   z-index: 2; pointer-events: none; /* let touches go to page */
 }
 
+/* generic 2D overlay container, center & bob */
+.overlay-2d {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+.center-bob { animation: bob 2s ease-in-out infinite; }
+@keyframes bob {
+  0%,100% { transform: translate(-50%, -52%); }
+  50% { transform: translate(-50%, -48%); }
+}
+
 /* status */
 #scan-result {
   margin-top: 1rem; padding: .75rem 1rem;
-  background-color: #e9ecef; border-radius: 8px; font-weight: 500;
+  background-color: #e3f2fd; border-radius: 10px; font-weight: 600; color: #0d47a1;
   transition: all .3s ease;
 }
 
 /* loader */
 #loader {
   position: absolute; top: 50%; left: 50%;
-  width: 50px; height: 50px;
-  border: 5px solid #f3f3f3; border-top: 5px solid #E4572E;
+  width: 50px; height: 50%;
+  max-height: 50px;
+  border: 5px solid rgba(255,255,255,.4); border-top: 5px solid #E4572E;
   border-radius: 50%; transform: translate(-50%, -50%);
   animation: spin 1s linear infinite; z-index: 3;
 }
@@ -63,9 +78,10 @@ p { color: #666; }
   margin-top: .5rem;
   border: 0; border-radius: 10px; padding: .75rem 1rem;
   background: #ff5a2e; color: #fff; font-weight: 600; cursor: pointer;
-  transition: background .3s ease;
+  transition: background .3s ease, transform .06s ease;
 }
 .primary:hover { background: #e04b22; }
+.primary:active { transform: translateY(1px); }
 
 /* Responsive layout for small devices */
 @media (max-width: 480px) {

@@ -1,5 +1,8 @@
-// EDGE 3D QR Scanner (no html5-qrcode)
-// Strategy: Use native BarcodeDetector when available, otherwise fallback to jsQR.
+// EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
+// ID-1 -> GLTF Astronaut (3D)
+// ID-2 -> GLTF Duck (3D)
+// ID-3 -> 3D Apple (A-Frame primitives, no external assets)
+// ID-4 -> 2D Duck (SVG overlay)
 // Works on HTTPS or localhost. Click 'Start Scanner' to begin.
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,41 +32,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Models for the two IDs
-  const modelMapping = {
+  // Overlay definitions
+  const overlays = {
     'ID-1': {
+      mode: 'gltf',
+      name: 'Astronaut',
       url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/astronaut.glb?v=1680320790145',
       scale: '0.8 0.8 0.8',
-      animation: 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;',
-      name: 'Astronaut'
+      animation: 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;'
     },
     'ID-2': {
+      mode: 'gltf',
+      name: 'Rubber Duck (3D)',
       url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/duck.glb?v=1680320791438',
       scale: '0.01 0.01 0.01',
-      animation: 'property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;',
-      name: 'Rubber Duck'
+      animation: 'property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;'
+    },
+    'ID-3': {
+      mode: 'apple3d',
+      name: '3D Apple'
+    },
+    'ID-4': {
+      mode: 'duck2d',
+      name: '2D Duck'
     }
   };
 
-  function showOverlay(modelData) {
-    modelContainer.innerHTML = `
-      <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
-        <a-assets>
-          <a-asset-item id="mdl" src="${modelData.url}"></a-asset-item>
-        </a-assets>
-        <a-entity id="model-entity" gltf-model="#mdl" scale="${modelData.scale}" position="0 0 -2.5"
-                  animation="${modelData.animation}"></a-entity>
-        <a-light type="ambient" intensity="0.8"></a-light>
-        <a-light type="directional" intensity="0.6" position="-1 1 2"></a-light>
-        <a-sky color="transparent" material="opacity: 0"></a-sky>
-        <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
-      </a-scene>
-    `;
+  function showOverlay(def) {
+    // Clean previous content
+    modelContainer.innerHTML = '';
 
-    const entity = document.getElementById('model-entity');
-    if (entity) {
-      loader.classList.remove('hidden');
-      entity.addEventListener('model-loaded', () => loader.classList.add('hidden'));
+    if (def.mode === 'gltf') {
+      modelContainer.innerHTML = `
+        <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
+          <a-assets>
+            <a-asset-item id="mdl" src="${def.url}"></a-asset-item>
+          </a-assets>
+          <a-entity id="model-entity" gltf-model="#mdl" scale="${def.scale}" position="0 0 -2.5"
+                    animation="${def.animation}"></a-entity>
+          <a-light type="ambient" intensity="0.8"></a-light>
+          <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
+          <a-sky color="transparent" material="opacity: 0"></a-sky>
+          <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
+        </a-scene>
+      `;
+      const entity = modelContainer.querySelector('#model-entity');
+      if (entity) {
+        loader.classList.remove('hidden');
+        entity.addEventListener('model-loaded', () => loader.classList.add('hidden'));
+      }
+      return;
+    }
+
+    if (def.mode === 'apple3d') {
+      // Build a simple apple with A-Frame primitives: sphere + stem + leaf
+      modelContainer.innerHTML = `
+        <a-scene embedded renderer="alpha: true; antialias: true;" vr-mode-ui="enabled: false">
+          <!-- Apple body -->
+          <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f">
+            <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
+          </a-sphere>
+
+          <!-- Stem -->
+          <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
+
+          <!-- Leaf -->
+          <a-plane position="0.12 0.8 -2.2" rotation="0 0 35" width="0.35" height="0.2" color="#43a047"
+                   material="side: double"></a-plane>
+
+          <a-light type="ambient" intensity="0.8"></a-light>
+          <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
+          <a-sky color="transparent" material="opacity: 0"></a-sky>
+          <a-camera position="0 0.5 2" look-controls="enabled: true" wasd-controls-enabled="false"></a-camera>
+        </a-scene>
+      `;
+      return;
+    }
+
+    if (def.mode === 'duck2d') {
+      // Simple centered SVG duck with bobbing animation
+      const wrapper = document.createElement('div');
+      wrapper.className = 'overlay-2d center-bob';
+      wrapper.innerHTML = `
+        <svg viewBox="0 0 128 96" width="150" height="112" xmlns="http://www.w3.org/2000/svg">
+          <g>
+            <ellipse cx="86" cy="72" rx="36" ry="10" fill="rgba(0,0,0,.15)"></ellipse>
+            <circle cx="40" cy="48" r="22" fill="#ffeb3b" stroke="#fbc02d" stroke-width="2"></circle>
+            <ellipse cx="78" cy="58" rx="38" ry="26" fill="#ffeb3b" stroke="#fbc02d" stroke-width="2"></ellipse>
+            <path d="M34 52 q8 6 18 0 q-8 -6 -18 0" fill="#ff9800" stroke="#f57c00" stroke-width="2"></path>
+            <circle cx="48" cy="44" r="3" fill="#263238"></circle>
+            <path d="M92 40 q20 12 0 24" fill="#81c784" stroke="#388e3c" stroke-width="2"></path>
+          </g>
+        </svg>
+      `;
+      modelContainer.appendChild(wrapper);
+      return;
     }
   }
 
@@ -91,12 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (useBarcodeDetector) {
       try {
         const formats = await window.BarcodeDetector.getSupportedFormats();
-        if (!formats.includes('qr_code')) {
-          useBarcodeDetector = false;
-        }
-      } catch (_) {
-        useBarcodeDetector = false;
-      }
+        if (!formats.includes('qr_code')) useBarcodeDetector = false;
+      } catch (_) { useBarcodeDetector = false; }
     }
     if (useBarcodeDetector) {
       detector = new window.BarcodeDetector({ formats: ['qr_code'] });
@@ -134,12 +193,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleText(text) {
     if (!text || text === lastText) return;
     lastText = text;
-    const modelData = modelMapping[text];
-    if (modelData) {
-      updateStatus(`Success! Loading ${modelData.name}...`);
-      showOverlay(modelData);
+    const def = overlays[text];
+    if (def) {
+      updateStatus(`Success! Overlay: ${def.name}`);
+      showOverlay(def);
     } else {
-      updateStatus(`QR "${text}" not recognized. Expect ID-1 or ID-2.`);
+      updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`);
       clearOverlay();
     }
   }
@@ -191,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       scanning = true;
       startBtn.style.display = 'none';
-      updateStatus('Ready. Point the camera at a QR code containing ID-1 or ID-2.');
+      updateStatus('Ready. Point the camera at a QR code containing ID-1 / ID-2 / ID-3 / ID-4.');
       scanLoop();
     } catch (err) {
       console.error('Initialization failed:', err);
