@@ -1,3 +1,6 @@
+// EDGE 3D QR Scanner
+// Works on HTTPS or localhost. Requires user gesture to start (button click).
+
 document.addEventListener('DOMContentLoaded', () => {
   const modelContainer = document.getElementById('model-container');
   const scanResultP = document.querySelector('#scan-result p');
@@ -19,21 +22,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Map payloads -> models (same IDs you requested)
+  // Map payloads -> models
   const modelMapping = {
-    "ID-1": {
-      url: "https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/astronaut.glb?v=1680320790145",
-      scale: "0.8 0.8 0.8",
-      animation: "property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;",
-      name: "Astronaut"
+    'ID-1': {
+      url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/astronaut.glb?v=1680320790145',
+      scale: '0.8 0.8 0.8',
+      animation: 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear;',
+      name: 'Astronaut'
     },
-    "ID-2": {
-      url: "https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/duck.glb?v=1680320791438",
-      scale: "0.01 0.01 0.01",
-      animation: "property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;",
-      name: "Rubber Duck"
+    'ID-2': {
+      url: 'https://cdn.glitch.global/b129b07a-2647-411a-a89c-852b76a66601/duck.glb?v=1680320791438',
+      scale: '0.01 0.01 0.01',
+      animation: 'property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 2000;',
+      name: 'Rubber Duck'
     }
-    // You can add more: "ID-3": {...}, "ID-4": {...}
   };
 
   function showOverlay(modelData) {
@@ -76,70 +78,72 @@ document.addEventListener('DOMContentLoaded', () => {
     loader.classList.add('hidden');
   }
 
-  function onScanSuccess(decodedText) {
-    // Only react to changes and only for known IDs
-    if (decodedText !== lastScannedId) {
-      lastScannedId = decodedText;
-      const modelData = modelMapping[decodedText];
+  // Fallback loader if the CDN didn't load the library for any reason
+  async function ensureHtml5QrcodeLoaded() {
+    if (window.Html5Qrcode) return;
 
-      if (modelData) {
-        updateStatus(`Success! Loading ${modelData.name}...`);
-        showOverlay(modelData);
-      } else {
-        updateStatus(`QR "${decodedText}" not recognized. Expect ID-1 or ID-2.`);
-        clearOverlay();
-      }
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load html5-qrcode library'));
+      document.head.appendChild(s);
+    });
+
+    if (!window.Html5Qrcode) {
+      throw new Error('Html5Qrcode still not available after loading.');
     }
   }
 
-  function onScanFailure() {
-    // Keep scanning silently; when nothing is seen, we don't spam messages
-  }
-  async function ensureHtml5QrcodeLoaded() {
-  if (window.Html5Qrcode) return;
-
-  // Fallback loader (second CDN) if primary failed for any reason
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js';
-    s.onload = resolve;
-    s.onerror = () => reject(new Error('Failed to load html5-qrcode library'));
-    document.head.appendChild(s);
-  });
-
-  if (!window.Html5Qrcode) {
-    throw new Error('Html5Qrcode still not available after loading.');
-  }
-}
-
   async function startScanner() {
     try {
-      updateStatus("Initializing scanner...");
-      html5QrCode = new Html5Qrcode("qr-reader");
+      updateStatus('Initializing scanner...');
+      await ensureHtml5QrcodeLoaded(); // <-- critical to avoid "not defined"
+
+      html5QrCode = new Html5Qrcode('qr-reader');
 
       const cameras = await Html5Qrcode.getCameras();
       if (!cameras || cameras.length === 0) {
-        throw new Error("No cameras found on this device.");
+        throw new Error('No cameras found on this device.');
       }
 
+      // Define a square scanning box sized to viewport
       const qrbox = (w, h) => {
         const s = Math.floor(Math.min(w, h) * 0.7);
         return { width: s, height: s };
       };
       const config = { fps: 10, qrbox };
 
-      updateStatus("Starting camera... please allow permission.");
-      await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure);
-      updateStatus("Ready. Point the camera at a QR code containing ID-1 or ID-2.");
-      startBtn.style.display = 'none'; // hide once started
+      updateStatus('Starting camera... please allow permission.');
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        (decodedText) => {
+          if (decodedText !== lastScannedId) {
+            lastScannedId = decodedText;
+            const modelData = modelMapping[decodedText];
+            if (modelData) {
+              updateStatus(`Success! Loading ${modelData.name}...`);
+              showOverlay(modelData);
+            } else {
+              updateStatus(`QR "${decodedText}" not recognized. Expect ID-1 or ID-2.`);
+              clearOverlay();
+            }
+          }
+        },
+        () => { /* silent on scan failure */ }
+      );
+
+      updateStatus('Ready. Point the camera at a QR code containing ID-1 or ID-2.');
+      startBtn.style.display = 'none';
     } catch (err) {
-      console.error("Camera initialization failed:", err);
+      console.error('Camera initialization failed:', err);
       if (err?.name === 'NotAllowedError') {
-        updateStatus("Camera access denied. Enable camera in browser settings and retry.", true);
+        updateStatus('Camera access denied. Enable camera in browser settings and retry.', true);
       } else if (err?.name === 'NotFoundError') {
-        updateStatus("No camera found on this device.", true);
+        updateStatus('No camera found on this device.', true);
       } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        updateStatus("This must be served over HTTPS or localhost for camera access.", true);
+        updateStatus('This must be served over HTTPS or localhost for camera access.', true);
       } else {
         updateStatus(`Could not start camera: ${err?.message || err}`, true);
       }
@@ -148,4 +152,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Require a tap (better iOS support)
   startBtn.addEventListener('click', startScanner);
+
+  // Clean up camera on unload (optional safety)
+  window.addEventListener('beforeunload', async () => {
+    try {
+      if (html5QrCode) { await html5QrCode.stop(); html5QrCode.clear(); }
+    } catch (_) {}
+  });
 });
