@@ -1,146 +1,76 @@
 /* Base styles */
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: #f0f2f5;
-  margin: 0;
-  padding: 1rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  color: #333;
+  margin: 0; padding: 1rem;
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; color: #333;
 }
 
 /* Container */
 #container {
-  background: #fff;
-  padding: 1.5rem 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 600px;
-  text-align: center;
+  background: #fff; padding: 1.5rem 2rem;
+  border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.1);
+  width: 100%; max-width: 600px; text-align: center;
 }
 
-.header-logo {
-  max-width: 250px;
-  margin-bottom: 1.5rem;
-}
-
-h1 {
-  margin-top: 0;
-  font-size: 1.75rem;
-  color: #333;
-}
-
-p {
-  color: #666;
-}
+.header-logo { max-width: 250px; margin-bottom: 1.5rem; }
+h1 { margin-top: 0; font-size: 1.75rem; color: #333; }
+p { color: #666; }
 
 /* Video container */
 #video-container {
   position: relative;
-  width: 100%;
-  padding-top: 100%; /* Keeps square shape */
-  border-radius: 8px;
-  overflow: hidden;
-  background: #222;
-  margin: 1rem 0;
+  width: 100%; padding-top: 100%; /* square */
+  border-radius: 8px; overflow: hidden; background: #222; margin: 1rem 0;
 }
 
-/* Camera feed */
-#qr-reader,
-#qr-reader video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 1;
+/* camera layer */
+#qr-reader, #qr-reader video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 1;
 }
 
-/* 3D model overlay */
+/* overlay layer */
 #model-container {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 2;
-  pointer-events: none; /* allows touch events to pass through */
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 2; pointer-events: none; /* let touches go to page */
 }
 
-/* Loader spinner */
-#loader {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 50px;
-  height: 50px;
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #E4572E;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  animation: spin 1s linear infinite;
-  z-index: 3;
-}
-
-.hidden {
-  display: none;
-}
-
-@keyframes spin {
-  100% {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
-
-/* Result / Status panel */
+/* status */
 #scan-result {
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  background-color: #e9ecef;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  margin-top: 1rem; padding: .75rem 1rem;
+  background-color: #e9ecef; border-radius: 8px; font-weight: 500;
+  transition: all .3s ease;
 }
 
-/* Button */
+/* loader */
+#loader {
+  position: absolute; top: 50%; left: 50%;
+  width: 50px; height: 50px;
+  border: 5px solid #f3f3f3; border-top: 5px solid #E4572E;
+  border-radius: 50%; transform: translate(-50%, -50%);
+  animation: spin 1s linear infinite; z-index: 3;
+}
+.hidden { display: none; }
+@keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+/* button */
 .primary {
-  margin-top: 0.5rem;
-  border: 0;
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
-  background: #ff5a2e;
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s ease;
+  margin-top: .5rem;
+  border: 0; border-radius: 10px; padding: .75rem 1rem;
+  background: #ff5a2e; color: #fff; font-weight: 600; cursor: pointer;
+  transition: background .3s ease;
 }
-
-.primary:hover {
-  background: #e04b22;
-}
+.primary:hover { background: #e04b22; }
 
 /* Responsive layout for small devices */
 @media (max-width: 480px) {
-  body {
-    padding: 0.5rem;
-  }
-
-  #container {
-    padding: 1rem;
-  }
-
-  .header-logo {
-    max-width: 200px;
-    margin-bottom: 1rem;
-  }
-
-  h1 {
-    font-size: 1.5rem;
-  }
+  body { padding: .5rem; }
+  #container { padding: 1rem; }
+  .header-logo { max-width: 200px; margin-bottom: 1rem; }
+  h1 { font-size: 1.5rem; }
 }
