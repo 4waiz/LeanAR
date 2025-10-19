@@ -95,6 +95,22 @@ document.addEventListener('DOMContentLoaded', () => {
   function onScanFailure() {
     // Keep scanning silently; when nothing is seen, we don't spam messages
   }
+  async function ensureHtml5QrcodeLoaded() {
+  if (window.Html5Qrcode) return;
+
+  // Fallback loader (second CDN) if primary failed for any reason
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load html5-qrcode library'));
+    document.head.appendChild(s);
+  });
+
+  if (!window.Html5Qrcode) {
+    throw new Error('Html5Qrcode still not available after loading.');
+  }
+}
 
   async function startScanner() {
     try {
