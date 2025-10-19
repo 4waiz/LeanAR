@@ -1,3 +1,4 @@
+
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
 // Overlays use A-Frame primitives (fast, works offline).
 // IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 2D Duck.
@@ -147,13 +148,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // iOS: proactively ask for motion permission on user tap,
+  // so any internal A-Frame UI doesn't need to show its own dialog.
+  async function requestMotionPermissionIfNeeded() {
+    try {
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        await DeviceMotionEvent.requestPermission().catch(()=>{});
+      }
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        await DeviceOrientationEvent.requestPermission().catch(()=>{});
+      }
+    } catch (_) { /* ignore */ }
+  }
+
   async function startCamera() {
     const constraints = {
       audio: false,
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
     };
     streamRef = await navigator.mediaDevices.getUserMedia(constraints);
-    // IMPORTANT: #video exists in index.html; otherwise you'll get the srcObject error
     video.srcObject = streamRef;
     video.setAttribute('playsinline', 'true'); // iOS
     await video.play();
@@ -181,15 +196,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = performance.now();
     if (text) {
       if (text !== activeId) {
-        activeId = text;
-        handleRecognizedText(text);
+        activeId = text; handleRecognizedText(text);
       }
       lastSeenAt = now;
     } else {
       if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
-        activeId = null; lastSeenAt = 0;
-        clearOverlay();
-        updateStatus('Lost QR. Searching…');
+        activeId = null; lastSeenAt = 0; clearOverlay(); updateStatus('Lost QR. Searching…');
       }
     }
   }
@@ -208,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (codes && codes.length) detectedText = codes[0].rawValue || codes[0].displayValue;
           } else {
             if (!canvas) { canvas = document.createElement('canvas'); ctx = canvas.getContext('2d', { willReadFrequently: true }); }
-            // Downscale for jsQR speed
             const vw = video.videoWidth, vh = video.videoHeight;
             const scale = JSQR_TARGET_W / Math.max(1, vw);
             canvas.width = Math.floor(vw * scale);
@@ -219,9 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (code && code.data) detectedText = code.data;
           }
         }
-      } catch (e) {
-        console.warn('scan error', e);
-      }
+      } catch (e) { console.warn('scan error', e); }
     }
 
     registerDetection(detectedText);
@@ -233,6 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not supported in this browser.');
       }
+      // Request motion permission proactively on iOS
+      await requestMotionPermissionIfNeeded();
+
       updateStatus('Starting camera...');
       await startCamera();
       updateStatus('Preparing QR detection...');
