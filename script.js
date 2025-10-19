@@ -1,11 +1,7 @@
-
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Overlays are lightweight & local (no external GLTF) for speed & iOS compatibility.
-// - ID-1: EDGE Ring (torus-knot, spinning)
-// - ID-2: UFO (bobbing saucer, lights)
-// - ID-3: Apple (primitives)
-// - ID-4: 2D Duck (SVG)
-// Also: removes overlay if code not seen for 2s; throttled jsQR and downscaled frames for speed.
+// Overlays use A-Frame primitives (fast, works offline).
+// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 2D Duck.
+// If QR disappears for 2s => overlay is removed and scanning continues.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -16,9 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const startBtn = document.getElementById('start-btn');
 
   // Tuning
-  const LOST_TIMEOUT_MS = 2000;       // clear overlay if not seen for this long
-  const JSQR_TARGET_W = 480;          // downscale width for jsQR speed
-  const SCAN_MIN_INTERVAL = 60;       // min ms between scans (~16=60fps; 60=~16fps)
+  const LOST_TIMEOUT_MS = 2000; // clear overlay if code not seen for this long
+  const JSQR_TARGET_W    = 480; // downscale width for jsQR speed
+  const SCAN_MIN_INTERVAL = 60; // ms between decode attempts
 
   // State
   let scanning = false;
@@ -26,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastSeenAt = 0;
   let lastScanAt = 0;
 
-  // Camera / detection state
+  // Camera / detection
   let streamRef = null;
   let useBarcodeDetector = false;
   let detector = null;
@@ -39,12 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
     scanResultDiv.style.color = isError ? '#D8000C' : '#0d47a1';
   }
 
-  // Overlay builders (no GLTF, all local)
+  // Overlay set
   const overlays = {
     'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
     'ID-2': { mode: 'ufo3d',    name: 'UFO' },
     'ID-3': { mode: 'apple3d',  name: '3D Apple' },
-    'ID-4': { mode: 'duck2d',   name: '2D Duck' },
+    'ID-4': { mode: 'duck2d',   name: '2D Duck'  },
   };
 
   function sceneWrap(inner) {
@@ -74,10 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (def.mode === 'ufo3d') {
       const inner = `
         <a-entity position="0 0 -2.5" animation="property: position; to: 0 0.2 -2.5; dir: alternate; loop: true; dur: 1500">
-          <a-cylinder height="0.18" radius="0.9" color="#8e9eab"
-                      material="metalness:0.6; roughness:0.2"></a-cylinder>
-          <a-sphere radius="0.5" position="0 0.35 0" color="#cfd8dc"
-                    material="metalness:0.1; roughness:0.9"></a-sphere>
+          <a-cylinder height="0.18" radius="0.9" color="#8e9eab" material="metalness:0.6; roughness:0.2"></a-cylinder>
+          <a-sphere radius="0.5" position="0 0.35 0" color="#cfd8dc" material="metalness:0.1; roughness:0.9"></a-sphere>
           <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85"
                   material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
           <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
@@ -159,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
     };
     streamRef = await navigator.mediaDevices.getUserMedia(constraints);
+    // IMPORTANT: #video exists in index.html; otherwise you'll get the srcObject error
     video.srcObject = streamRef;
     video.setAttribute('playsinline', 'true'); // iOS
     await video.play();
@@ -192,8 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastSeenAt = now;
     } else {
       if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
-        activeId = null;
-        lastSeenAt = 0;
+        activeId = null; lastSeenAt = 0;
         clearOverlay();
         updateStatus('Lost QR. Searching…');
       }
@@ -214,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (codes && codes.length) detectedText = codes[0].rawValue || codes[0].displayValue;
           } else {
             if (!canvas) { canvas = document.createElement('canvas'); ctx = canvas.getContext('2d', { willReadFrequently: true }); }
-            // Downscale frame to speed up jsQR
+            // Downscale for jsQR speed
             const vw = video.videoWidth, vh = video.videoHeight;
             const scale = JSQR_TARGET_W / Math.max(1, vw);
             canvas.width = Math.floor(vw * scale);
@@ -239,10 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not supported in this browser.');
       }
-
       updateStatus('Starting camera...');
       await startCamera();
-
       updateStatus('Preparing QR detection...');
       await setupDetector();
 
