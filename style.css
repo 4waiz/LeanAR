@@ -1,4 +1,3 @@
-
 /* Base styles */
 * { box-sizing: border-box; }
 
@@ -6,7 +5,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: #f0f2f5;
   margin: 0; padding: 1rem;
-  display: flex; justify-content: center; align-items: center;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
   min-height: 100vh; color: #333;
 }
 
@@ -39,6 +38,28 @@ p { color: #3a5b63; }
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   z-index: 2; pointer-events: auto;
+}
+
+/* Force A-Frame canvas to be transparent when overlaid */
+#model-container canvas { background: transparent !important; }
+#model-container a-scene { background: transparent !important; }
+
+/* Caption below the model */
+#model-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  transform: translateX(-50%);
+  padding: .5rem .75rem;
+  border-radius: 10px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-weight: 600;
+  font-size: .95rem;
+  line-height: 1;
+  z-index: 3;
+  pointer-events: none; /* don’t block taps */
+  backdrop-filter: blur(2px);
 }
 
 /* generic 2D overlay container, center & bob */
@@ -84,9 +105,14 @@ p { color: #3a5b63; }
 .primary:hover { background: #e04b22; }
 .primary:active { transform: translateY(1px); }
 
-/* Force A-Frame canvas to be transparent when overlaid */
-#model-container canvas { background: transparent !important; }
-#model-container a-scene { background: transparent !important; }
+/* Footer (plain black text, link inherits) */
+.footer {
+  margin-top: 1rem;
+  color: #000;
+  font-weight: 600;
+  text-align: center;
+}
+.footer a { color: inherit; text-decoration: underline; }
 
 /* Responsive layout for small devices */
 @media (max-width: 480px) {
