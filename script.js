@@ -1,7 +1,7 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Fullscreen mobile AR: no scroll, camera fills viewport, transparent 3D overlay.
+// Unified desktop/mobile UI. Tap "Start Scanner" -> camera on. Transparent 3D overlay.
 // Interactive: tap models to cycle colors.
-// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE 3D Text.
+// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE 3D Text (fixed).
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanResultDiv = document.getElementById('scan-result');
   const loader = document.getElementById('loader');
   const startBtn = document.getElementById('start-btn');
+  const startLogo = document.getElementById('start-logo');
 
   // ---------------- A-Frame component: color-cycle ----------------
   if (window.AFRAME && !AFRAME.components['color-cycle']) {
@@ -74,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
     'ID-2': { mode: 'ufo3d',    name: 'UFO' },
     'ID-3': { mode: 'apple3d',  name: '3D Apple' },
-    'ID-4': { mode: 'edgeText', name: 'EDGE 3D Text' },
+    'ID-4': { mode: 'edgeText', name: 'EDGE 3D Text' }, // fixed
   };
 
   // Scene wrapper: transparent renderer + mouse/touch cursor
@@ -130,21 +131,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (def.mode === 'ufo3d') {
       const inner = `
-        <a-entity position="0 0 -2.5"
-                  class="clickable"
-                  color-cycle="selector: .color-part; colors: #8e9eab, #9c27b0, #43a047, #ff7043"
-                  animation="property: position; to: 0 0.2 -2.5; dir: alternate; loop: true; dur: 1500">
-          <a-cylinder height="0.18" radius="0.9" class="color-part"
-                      material="color: #8e9eab; metalness:0.6; roughness:0.2"></a-cylinder>
-          <a-sphere radius="0.5" position="0 0.35 0" class="color-part"
-                    material="color: #cfd8dc; metalness:0.1; roughness:0.9"></a-sphere>
-          <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85" class="color-part"
-                  material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
-          <!-- nav lights unchanged -->
-          <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
-          <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
-          <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
-          <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
+        <a-entity position="0 0 -2.5">
+          <a-entity class="clickable"
+                    color-cycle="selector: .color-part; colors: #8e9eab, #9c27b0, #43a047, #ff7043"
+                    animation="property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 1500">
+            <a-cylinder height="0.18" radius="0.9" class="color-part"
+                        material="color: #8e9eab; metalness:0.6; roughness:0.2"></a-cylinder>
+            <a-sphere radius="0.5" position="0 0.35 0" class="color-part"
+                      material="color: #cfd8dc; metalness:0.1; roughness:0.9"></a-sphere>
+            <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85" class="color-part"
+                    material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
+            <!-- nav lights unchanged -->
+            <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
+            <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
+            <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
+            <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
+          </a-entity>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       setCaption(def.name);
@@ -153,27 +155,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (def.mode === 'apple3d') {
       const inner = `
-        <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f"
-                  class="clickable"
-                  color-cycle="colors: #d32f2f, #43a047, #1976d2, #fdd835">
-          <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
-        </a-sphere>
-        <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
-        <a-plane position="0.12 0.8 -2.2" rotation="0 0 35" width="0.35" height="0.2" color="#43a047" material="side: double"></a-plane>`;
+        <a-entity position="0 0 -2.5">
+          <a-sphere radius="0.7" color="#d32f2f"
+                    class="clickable"
+                    color-cycle="colors: #d32f2f, #43a047, #1976d2, #fdd835">
+            <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
+          </a-sphere>
+          <a-cylinder position="0 0.65 0.3" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
+          <a-plane position="0.12 0.8 0.3" rotation="0 0 35" width="0.35" height="0.2" color="#43a047" material="side: double"></a-plane>
+        </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       setCaption(def.name);
       return;
     }
 
     if (def.mode === 'edgeText') {
-      // EDGE 3D text — color cycles via text color
+      /* FIXED: use <a-text> primitive directly, make the text itself clickable
+         so raycaster can intersect a real mesh with the .clickable class. */
       const inner = `
-        <a-entity position="0 0 -2.5"
-                  class="clickable"
-                  color-cycle="selector: .color-part; colors: #ffffff, #ff5a2e, #00d1b2, #1976d2, #9c27b0">
-          <a-entity class="color-part"
-                    position="0 0 0"
-                    text="value: EDGE; align: center; width: 4; color: #ffffff"></a-entity>
+        <a-entity position="0 0 -2.5">
+          <a-text
+            value="EDGE"
+            align="center"
+            width="4"
+            color="#ffffff"
+            class="clickable"
+            color-cycle="colors: #ffffff, #ff5a2e, #00d1b2, #1976d2, #9c27b0">
+          </a-text>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       setCaption(def.name);
@@ -249,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleRecognizedText(text) {
     const def = overlays[text];
     if (def) {
-      showOverlay(def);                // keep UI minimal: no non-error banners
+      showOverlay(def);                // minimal UI: no non-error banners
     } else {
       updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`, true);
       clearOverlay();
@@ -272,7 +280,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function scanLoop() {
     if (!scanning) return;
-
     let detectedText = null;
     const now = performance.now();
     if (now - lastScanAt >= SCAN_MIN_INTERVAL) {
@@ -296,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (e) { /* ignore single-frame errors */ }
     }
-
     registerDetection(detectedText);
     rafId = requestAnimationFrame(scanLoop);
   }
@@ -314,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       scanning = true;
       startBtn.style.display = 'none';
+      if (startLogo) startLogo.style.display = 'none';
       scanLoop();
     } catch (err) {
       const msg =
