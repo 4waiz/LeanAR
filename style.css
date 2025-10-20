@@ -7,15 +7,15 @@
   --card-wvw: 98vw;
   --card-max-w: 1280px;
 
-  /* image sizing */
+  /* image sizing (mobile defaults; overridden on larger screens below) */
   --img-max-w-vw: 42vw;
   --img-max-w-px: 460px;
   --img-max-h: 68vh;
 
-  /* <<< TRANSPARENCY CONTROLS >>> */
-  --card-rgb: 255,255,255;    /* panel color (255,255,255 = white glass | 0,0,0 = dark glass) */
-  --card-alpha: 0.5;         /* 0 = fully transparent, 0.5 = medium, 0.9 = nearly solid */
-  --card-blur: 5px;           /* backdrop blur strength; set 0px if you want no blur */
+  /* <<< transparency controls >>> */
+  --card-rgb: 255,255,255;    /* 255,255,255 = light glass | 0,0,0 = dark glass */
+  --card-alpha: 0.18;         /* 0 = transparent, 0.5 = medium, 0.9 = solid */
+  --card-blur: 6px;           /* set 0px to remove blur */
 }
 
 *{ box-sizing:border-box; }
@@ -58,11 +58,8 @@ html,body{
   padding:clamp(12px, 3.2vw, 24px);
   border-radius:20px;
 
-  /* <<< transparency here >>> */
   background: rgba(var(--card-rgb), var(--card-alpha));
   backdrop-filter: blur(var(--card-blur)) saturate(1.05);
-
-  /* No border so there’s no visible line when transparent */
   border:none;
   box-shadow:0 10px 28px rgba(0,0,0,.25);
 }
@@ -70,7 +67,7 @@ html,body{
 .info-text{
   flex:1 1 64%;
   min-width:0;
-  color:#111;                 /* black text */
+  color:#111;
 }
 
 .info-image{
@@ -86,13 +83,12 @@ html,body{
   object-fit:cover;
 }
 
-/* ----- PLAIN BLACK TEXT (no outline, no shadow) ----- */
+/* Plain black text (no outlines) */
 .outlined{
   color:#111 !important;
   -webkit-text-stroke: 0 !important;
   text-shadow:none !important;
 
-  /* clean wrapping */
   word-break: normal;
   overflow-wrap: break-word;
   hyphens: none;
@@ -101,7 +97,7 @@ html,body{
 }
 .outlined.h1{ -webkit-text-stroke: 0 !important; }
 
-/* Type scale / rhythm */
+/* Base type (mobile) */
 #slide-title{
   margin:0 0 .55rem 0;
   font-weight:900;
@@ -120,7 +116,54 @@ html,body{
   font-weight:900;
 }
 
-/* Error banner (only on errors) */
+/* ---------- Tablet: give text more room + bigger type ---------- */
+@media (min-width: 768px){
+  .info-text{ flex:1 1 70%; }
+  .info-image{ flex:0 0 30%; }
+  .info-image img{
+    max-width:min(30vw, 420px);
+    max-height:72vh;
+  }
+
+  #slide-title{
+    font-size: clamp(2rem, 3.8vw, 3rem);
+    line-height:1.16;
+  }
+  .info-text p{
+    font-size: clamp(1.15rem, 2.1vw, 1.5rem);
+    line-height:1.46;
+  }
+  .info-content{
+    gap:min(4vw, 40px);
+    padding:clamp(16px, 2.6vw, 28px);
+    --card-wvw: 98vw;           /* keep big card */
+    --card-max-w: 1400px;       /* allow wider on tablets/desktops */
+  }
+}
+
+/* ---------- Desktop/Laptop: text dominates even more ---------- */
+@media (min-width: 1200px){
+  .info-text{ flex:1 1 72%; }
+  .info-image{ flex:0 0 28%; }
+  .info-image img{
+    max-width:min(28vw, 440px);
+    max-height:74vh;
+  }
+
+  #slide-title{
+    font-size: clamp(2.2rem, 3.2vw, 3.4rem);
+  }
+  .info-text p{
+    font-size: clamp(1.25rem, 1.8vw, 1.7rem);
+  }
+
+  .info-content{
+    gap:min(3.6vw, 44px);
+    --card-max-w: 1500px;
+  }
+}
+
+/* Error banner */
 #scan-result{
   position:absolute; top: env(safe-area-inset-top, 8px); left:50%;
   transform:translateX(-50%);
@@ -161,12 +204,7 @@ html,body{
 .footer{
   position:fixed; bottom:max(6px, env(safe-area-inset-bottom));
   left:0; right:0; text-align:center; z-index:2;
-  font-weight:600; color:#ffffff; line-height:1; font-size:.99rem;
+  font-weight:600; color:#ffffff; line-height:1; font-size:.98rem;
   padding:.25rem 0;
 }
 .footer a{ color:inherit; text-decoration:underline; }
-
-/* Narrow phones: keep image reasonable so text has room */
-@media (max-width: 420px){
-  .info-image img{ max-width: 34vw; }
-}
