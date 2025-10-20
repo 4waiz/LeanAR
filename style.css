@@ -4,8 +4,8 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden;            /* no scrolling */
-  background: #000;            /* hidden by the camera feed */
+  overflow: hidden;                  /* no scrolling */
+  background: #000;                  /* hidden by the camera feed */
   -webkit-tap-highlight-color: transparent;
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -16,18 +16,18 @@ html, body {
   position: fixed;
   inset: 0;
   width: 100vw;
-  height: 100dvh;              /* modern viewport unit */
-  height: 100svh;              /* fallback */
-  min-height: 100vh;           /* older fallback */
+  height: 100dvh;                    /* modern viewport unit */
+  height: 100svh;                    /* fallback */
+  min-height: 100vh;                 /* older fallback */
 }
 
 /* Camera layer */
 #qr-reader, #qr-reader video {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
-  object-fit: cover;           /* fill the screen */
+  object-fit: cover;                 /* fill the screen */
   z-index: 1;
-  background: #000;
+  background: #000;                  /* if camera paused, keep black not white */
 }
 
 /* 3D overlay layer */
@@ -35,9 +35,15 @@ html, body {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   z-index: 2; pointer-events: auto;
+  background: transparent !important;
 }
-#model-container canvas { background: transparent !important; }
-#model-container a-scene { background: transparent !important; }
+
+/* Force A-Frame canvas truly transparent */
+#model-container canvas,
+#model-container .a-canvas,
+#model-container a-scene {
+  background: transparent !important;
+}
 
 /* Caption under model */
 #model-caption {
