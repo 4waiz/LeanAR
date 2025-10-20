@@ -14,7 +14,7 @@
 
   /* <<< TRANSPARENCY CONTROLS >>> */
   --card-rgb: 255,255,255;    /* panel color (255,255,255 = white glass | 0,0,0 = dark glass) */
-  --card-alpha: 0.20;         /* 0 = fully transparent, 0.5 = medium, 0.9 = nearly solid */
+  --card-alpha: 0.5;         /* 0 = fully transparent, 0.5 = medium, 0.9 = nearly solid */
   --card-blur: 5px;           /* backdrop blur strength; set 0px if you want no blur */
 }
 
