@@ -2,14 +2,16 @@
   --footer-h: 28px;           /* set in JS */
   --overlay-lift: -4vh;       /* set in JS per screen height */
 
-  /* NEW: easy sizing controls */
-  --card-wvw: 98vw;           /* card width as viewport width */
-  --card-max-w: 1300px;       /* max card width in px */
-  --img-max-w-vw: 42vw;       /* right image max width as vw */
-  --img-max-w-px: 460px;      /* right image max width in px */
-  --img-max-h: 68vh;          /* right image max height */
-  --stroke-h1: .8px;          /* tuned in JS for DPR */
-  --stroke-body: .6px;        /* tuned in JS for DPR */
+  /* sizing controls */
+  --card-wvw: 98vw;
+  --card-max-w: 1300px;
+  --img-max-w-vw: 42vw;
+  --img-max-w-px: 460px;
+  --img-max-h: 68vh;
+
+  /* outline thickness (set in JS by DPR; safe defaults here) */
+  --stroke-h1: .8px;
+  --stroke-body: .6px;
 }
 
 *{ box-sizing:border-box; }
@@ -44,57 +46,60 @@ html,body{
   pointer-events:none;
 }
 
-/* BIGGER card that JS injects */
+/* BIGGER card */
 .info-content{
-  width:min(var(--card-wvw), var(--card-max-w));   /* <— bigger */
+  width:min(var(--card-wvw), var(--card-max-w));
   display:flex; align-items:flex-start; justify-content:space-between;
-  gap: min(5vw, 36px);                             /* a bit wider gap */
-  padding: clamp(10px, 3vw, 20px);                 /* more padding */
+  gap: min(5vw, 36px);
+  padding: clamp(10px, 3vw, 20px);
   border-radius: 18px;
-  background: rgba(0,0,0,.22);
-  backdrop-filter: blur(3px);
+  background: rgba(0,0,0,.30);      /* a touch stronger for readability */
+  backdrop-filter: blur(5px) saturate(1.05);
 }
 
 .info-text{ flex:1 1 64%; min-width: 0; }
 .info-image{ flex:0 0 36%; display:flex; justify-content:center; }
 .info-image img{
   width:auto; height:auto;
-  max-width:min(var(--img-max-w-vw), var(--img-max-w-px)); /* <— bigger */
-  max-height: var(--img-max-h);                            /* <— taller */
+  max-width:min(var(--img-max-w-vw), var(--img-max-w-px));
+  max-height: var(--img-max-h);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,.32);
   object-fit: cover;
 }
 
-/* Outlined text: ONLY black fill + thin white outline */
+/* ----- CLEAN outline: black fill + thin white stroke ----- */
 .outlined{
   color:#000;
   -webkit-text-stroke: var(--stroke-body) #fff;
   text-shadow:none;
-  letter-spacing:.01em;
-  white-space:normal;
-  overflow-wrap:anywhere;
-  hyphens:auto;
+  letter-spacing:.005em;
+
+  /* >>> prevent ugly mid-word breaks <<< */
+  word-break: normal;            /* don’t force-split words */
+  overflow-wrap: break-word;     /* wrap only at spaces/allowed points */
+  hyphens: manual;               /* never auto hyphenate */
+  -webkit-hyphens: manual;
 }
 .outlined.h1{ -webkit-text-stroke: var(--stroke-h1) #fff; }
 
-/* Type scale / rhythm (unchanged and readable) */
+/* Type scale / rhythm */
 #slide-title{
   margin:0 0 .5rem 0;
   font-weight:900;
   font-size: clamp(1.35rem, 6.2vw, 2.4rem);
-  line-height:1.15;
-  text-wrap: balance;
+  line-height:1.18;
+  text-wrap: balance;            /* nicer heading balance on supported Safari */
 }
 .info-text p{
-  margin:.45rem 0;
+  margin:.5rem 0;
   font-weight:900;
-  font-size: clamp(.98rem, 3.6vw, 1.22rem);
-  line-height:1.35;
+  font-size: clamp(1rem, 3.6vw, 1.24rem);
+  line-height:1.36;
 }
 .info-text .label{ text-transform:uppercase; }
 
-/* Error banner (only on errors) */
+/* Error banner */
 #scan-result{
   position:absolute; top: env(safe-area-inset-top, 8px); left:50%;
   transform:translateX(-50%);
