@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('orientationchange', () => { setFooterHeightVar(); setOverlayLift(); });
 
   // -------------------- Slide Content (pages 1–7) --------------------
-  // Source: "Drones Wastes Comments.pdf" (pages 1–7)
   const SLIDES = {
     'ID-1': {
       title: 'INVENTORY',
@@ -82,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   // Scanner core (BarcodeDetector → jsQR fallback)
-  const LOST_TIMEOUT_MS = 2000;
+  const LOST_TIMEOUT_MS = 4000;  // <-- Keep slide visible for 4s after last good scan
   const JSQR_TARGET_W = 480;
   const SCAN_MIN_INTERVAL = 60;
 
@@ -104,20 +103,40 @@ document.addEventListener('DOMContentLoaded', () => {
     imgEl.alt = slide.alt || slide.title;
     infoOverlay.classList.remove('hidden');
   }
-  function hideSlide(){ infoOverlay.classList.add('hidden'); }
+  function hideSlide(){
+    infoOverlay.classList.add('hidden');
+    titleEl.textContent = '';
+    defEl.textContent = '';
+    descEl.textContent = '';
+    imgEl.removeAttribute('src');
+    imgEl.alt = '';
+  }
 
+  // Only show overlay when a valid ID-x is detected.
+  // If we see some other QR text, hide immediately.
   function registerDetection(text){
     const now = performance.now();
-    if (text){
+    const slide = text ? SLIDES[text] : null;
+
+    if (slide){
       if (text !== activeId){
         activeId = text;
-        showSlide(SLIDES[text]);
+        showSlide(slide);
       }
       lastSeenAt = now;
-    }else{
-      if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS){
-        activeId = null; lastSeenAt = 0; hideSlide();
-      }
+      return;
+    }
+
+    // Unrecognized code? Hide right away.
+    if (text && !slide){
+      activeId = null;
+      hideSlide();
+      return;
+    }
+
+    // No code in view: wait for LOST_TIMEOUT_MS, then hide.
+    if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS){
+      activeId = null; lastSeenAt = 0; hideSlide();
     }
   }
 
@@ -153,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     video.srcObject = streamRef;
     video.setAttribute('playsinline','true');
     await video.play();
+    hideSlide(); // ensure overlay is hidden right at start
   }
 
   function stopCamera(){
