@@ -1,5 +1,6 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Transparent AR overlay + interactive color-cycling on click.
+// Fullscreen mobile AR: no scroll, camera fills viewport, transparent 3D overlay.
+// Interactive: tap models to cycle colors.
 // IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE 3D Text.
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,15 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
     AFRAME.registerComponent('color-cycle', {
       schema: {
         colors:   { default: '#d32f2f, #43a047, #1976d2, #fdd835' },
-        selector: { default: '' } // optional: child targets inside this entity
+        selector: { default: '' } // optional: child targets
       },
       init: function () {
         this.palette = (this.data.colors || '')
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean);
+          .split(',').map(s => s.trim()).filter(Boolean);
         if (!this.palette.length) this.palette = ['#ff0000', '#00ff00', '#0000ff'];
-
         this.idx = 0;
         this.targets = this.data.selector
           ? Array.from(this.el.querySelectorAll(this.data.selector))
@@ -33,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
           this.idx = (this.idx + 1) % this.palette.length;
           const col = this.palette[this.idx];
           this.targets.forEach(t => {
-            // If it's text, change the text color; otherwise, change material color
             if (t.components && t.components.text) {
               t.setAttribute('text', 'color', col);
             } else {
@@ -41,20 +38,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           });
         };
-
         this.el.addEventListener('click', this.onClick);
       },
-      remove: function () {
-        this.el.removeEventListener('click', this.onClick);
-      }
+      remove: function () { this.el.removeEventListener('click', this.onClick); }
     });
   }
   // ----------------------------------------------------------------
 
   // Tuning
-  const LOST_TIMEOUT_MS = 2000;  // clear overlay if code not seen for this long
-  const JSQR_TARGET_W   = 480;   // downscale width for jsQR speed
-  const SCAN_MIN_INTERVAL = 60;  // ms between decode attempts
+  const LOST_TIMEOUT_MS = 2000;   // clear overlay if code not seen for this long
+  const JSQR_TARGET_W   = 480;    // downscale width for jsQR speed
+  const SCAN_MIN_INTERVAL = 60;   // ms between decode attempts
 
   // State
   let scanning = false;
@@ -69,10 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let rafId = null;
   let canvas = null, ctx = null;
 
+  // Show status ONLY on errors (to keep UI clean)
   function updateStatus(message, isError = false) {
-    scanResultP.textContent = message;
-    scanResultDiv.style.backgroundColor = isError ? '#FFD2D2' : '#e3f2fd';
-    scanResultDiv.style.color = isError ? '#D8000C' : '#0d47a1';
+    if (scanResultP) scanResultP.textContent = message;
+    if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
   // Overlay definitions
@@ -146,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     material="color: #cfd8dc; metalness:0.1; roughness:0.9"></a-sphere>
           <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85" class="color-part"
                   material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
-          <!-- keep nav lights constant -->
+          <!-- nav lights unchanged -->
           <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
           <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
           <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
@@ -215,10 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (useBarcodeDetector) {
       detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-      updateStatus('Using native BarcodeDetector.');
     } else {
       await ensureJsQR();
-      updateStatus('Using jsQR fallback.');
     }
   }
 
@@ -257,10 +249,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleRecognizedText(text) {
     const def = overlays[text];
     if (def) {
-      updateStatus(`Success! Overlay: ${def.name}`);
-      showOverlay(def);
+      showOverlay(def);                // keep UI minimal: no non-error banners
     } else {
-      updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`);
+      updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`, true);
       clearOverlay();
     }
   }
@@ -274,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastSeenAt = now;
     } else {
       if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
-        activeId = null; lastSeenAt = 0; clearOverlay(); updateStatus('Lost QR. Searching…');
+        activeId = null; lastSeenAt = 0; clearOverlay();
       }
     }
   }
@@ -303,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (code && code.data) detectedText = code.data;
           }
         }
-      } catch (e) { console.warn('scan error', e); }
+      } catch (e) { /* ignore single-frame errors */ }
     }
 
     registerDetection(detectedText);
@@ -317,26 +308,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       await requestMotionPermissionIfNeeded();
 
-      updateStatus('Starting camera...');
+      loader.classList.remove('hidden');
       await startCamera();
-      updateStatus('Preparing QR detection...');
       await setupDetector();
 
       scanning = true;
       startBtn.style.display = 'none';
-      updateStatus('Ready. Scan ID-1 / ID-2 / ID-3 / ID-4.');
       scanLoop();
     } catch (err) {
-      console.error('Initialization failed:', err);
-      if (err?.name === 'NotAllowedError') {
-        updateStatus('Camera access denied. Enable camera permissions and retry.', true);
-      } else if (err?.name === 'NotFoundError') {
-        updateStatus('No camera found on this device.', true);
-      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        updateStatus('This must be served over HTTPS or localhost for camera access.', true);
-      } else {
-        updateStatus(`Could not start camera: ${err?.message || err}`, true);
-      }
+      const msg =
+        err?.name === 'NotAllowedError' ? 'Camera access denied. Enable camera permissions and retry.' :
+        err?.name === 'NotFoundError'   ? 'No camera found on this device.' :
+        (location.protocol !== 'https:' && location.hostname !== 'localhost')
+          ? 'This must be served over HTTPS or localhost for camera access.'
+          : `Could not start camera: ${err?.message || err}`;
+      updateStatus(msg, true);
+    } finally {
+      loader.classList.add('hidden');
     }
   }
 

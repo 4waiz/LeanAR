@@ -1,39 +1,42 @@
-/* Base styles */
+/* Reset & mobile-safe fullscreen */
 * { box-sizing: border-box; }
-
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;            /* no scrolling */
+  background: #000;            /* hidden by the camera feed */
+  -webkit-tap-highlight-color: transparent;
+}
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: #f0f2f5;
-  margin: 0; padding: 1rem;
-  display: flex; flex-direction: column; justify-content: center; align-items: center;
-  min-height: 100vh; color: #333;
+  color: #fff;
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
 
-/* Container */
-#container {
-  background: #fff; padding: 1.5rem 2rem;
-  border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.1);
-  width: 100%; max-width: 640px; text-align: center;
-}
-
-.header-logo { max-width: 250px; margin-bottom: 1.5rem; }
-h1 { margin-top: 0; font-size: 1.75rem; color: #0a2b33; }
-p { color: #3a5b63; }
-
-/* Video container */
+/* Fullscreen container uses modern viewport units to avoid iOS chrome jumps */
 #video-container {
-  position: relative;
-  width: 100%; padding-top: 100%; /* square */
-  border-radius: 12px; overflow: hidden; background: #0f2027; margin: 1rem 0;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;              /* modern */
+  height: 100svh;              /* fallback */
+  min-height: 100vh;           /* older fallback */
 }
 
-/* camera layer */
+/* Camera layer */
 #qr-reader, #qr-reader video {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; z-index: 1; background: #111;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;           /* fill the screen */
+  z-index: 1;
+  background: #000;
 }
 
-/* overlay layer */
+/* Overlay layer (A-Frame scene injected here) */
 #model-container {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
@@ -41,15 +44,15 @@ p { color: #3a5b63; }
   cursor: pointer;
 }
 
-/* Force A-Frame canvas to be transparent when overlaid */
+/* Ensure A-Frame stays transparent over the camera feed */
 #model-container canvas { background: transparent !important; }
 #model-container a-scene { background: transparent !important; }
 
-/* Caption below the model */
+/* Caption under model (only when a model is visible) */
 #model-caption {
   position: absolute;
   left: 50%;
-  bottom: 8%;
+  bottom: max(6%, 56px);       /* leave room for footer on small screens */
   transform: translateX(-50%);
   padding: .5rem .75rem;
   border-radius: 10px;
@@ -59,52 +62,59 @@ p { color: #3a5b63; }
   font-size: .95rem;
   line-height: 1;
   z-index: 3;
-  pointer-events: none; /* don’t block taps */
+  pointer-events: none;
   backdrop-filter: blur(2px);
 }
 
-/* status */
+/* Error status (hidden unless error) */
 #scan-result {
-  margin-top: 1rem; padding: .75rem 1rem;
-  background-color: #e3f2fd; border-radius: 10px; font-weight: 600; color: #0d47a1;
-  transition: all .3s ease;
-}
-
-/* loader */
-#loader {
-  position: absolute; top: 50%; left: 50%;
-  width: 50px; height: 50%;
-  max-height: 50px;
-  border: 5px solid rgba(255,255,255,.4); border-top: 5px solid #E4572E;
-  border-radius: 50%; transform: translate(-50%, -50%);
-  animation: spin 1s linear infinite; z-index: 3;
+  position: absolute; top: env(safe-area-inset-top, 8px); left: 50%;
+  transform: translateX(-50%);
+  padding: .5rem .75rem;
+  background-color: rgba(255, 210, 210, .95);
+  color: #D8000C;
+  border-radius: 10px;
+  font-weight: 700;
+  z-index: 4;
 }
 .hidden { display: none; }
+
+/* Loader */
+#loader {
+  position: absolute; top: 50%; left: 50%;
+  width: 56px; height: 56px;
+  border: 5px solid rgba(255,255,255,.35); border-top: 5px solid #E4572E;
+  border-radius: 50%; transform: translate(-50%, -50%);
+  animation: spin 1s linear infinite; z-index: 5;
+}
 @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
 
-/* button */
+/* Start button floats over camera; disappears after start */
 .primary {
-  margin-top: .5rem;
-  border: 0; border-radius: 10px; padding: .75rem 1rem;
-  background: #ff5a2e; color: #fff; font-weight: 600; cursor: pointer;
-  transition: background .3s ease, transform .06s ease;
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  border: 0; border-radius: 14px; padding: 1rem 1.25rem;
+  background: rgba(0,0,0,.5);
+  color: #fff; font-weight: 800; font-size: 1.1rem; letter-spacing: .3px;
+  z-index: 6; cursor: pointer;
+  backdrop-filter: blur(4px);
 }
-.primary:hover { background: #e04b22; }
-.primary:active { transform: translateY(1px); }
+.primary:active { transform: translate(-50%, -50%) scale(.98); }
 
-/* Footer (plain black text, link inherits) */
+/* Footer as a tiny overlay, no layout shift or scroll */
 .footer {
-  margin-top: 1rem;
-  color: #000;
-  font-weight: 600;
+  position: fixed;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  left: 0; right: 0;
   text-align: center;
+  z-index: 3;
+  font-weight: 600;
+  color: #000;                 /* per request: plain black text */
+  pointer-events: auto;
 }
 .footer a { color: inherit; text-decoration: underline; }
 
-/* Responsive layout for small devices */
+/* Small devices */
 @media (max-width: 480px) {
-  body { padding: .5rem; }
-  #container { padding: 1rem; }
-  .header-logo { max-width: 200px; margin-bottom: 1rem; }
-  h1 { font-size: 1.5rem; }
+  .primary { font-size: 1rem; padding: .9rem 1.1rem; }
 }
