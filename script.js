@@ -1,5 +1,5 @@
-// 7-ID QR overlay: shows slide text (outlined) + right-side image over live camera.
-// Overlay is created ONLY when a valid ID is seen; hidden otherwise.
+// AR slides for ID-1 … ID-7. Overlay is injected only on valid scan.
+// Keeps slide on screen for 4s after last good read.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanResultP = document.querySelector('#scan-result p');
   const scanResultDiv = document.getElementById('scan-result');
 
-  // Keep overlay clear of footer & lift on phones
+  /* ---------- UI tuning vars ---------- */
   function setFooterHeightVar(){
     const h = footer?.offsetHeight || 28;
     document.documentElement.style.setProperty('--footer-h', `${h}px`);
@@ -22,11 +22,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let lift = -4; if (h < 820) lift = -6; if (h < 740) lift = -8; if (h < 680) lift = -9.5;
     document.documentElement.style.setProperty('--overlay-lift', `${lift}vh`);
   }
-  setFooterHeightVar(); setOverlayLift();
+  function setStrokeForDPR(){
+    const dpr = window.devicePixelRatio || 1;
+    // On high-DPR phones, thinner stroke looks cleaner.
+    const h1 = dpr >= 3 ? 0.6 : dpr >= 2 ? 0.7 : 0.8;
+    const body = dpr >= 3 ? 0.45 : dpr >= 2 ? 0.55 : 0.6;
+    document.documentElement.style.setProperty('--stroke-h1', `${h1}px`);
+    document.documentElement.style.setProperty('--stroke-body', `${body}px`);
+  }
+  setFooterHeightVar(); setOverlayLift(); setStrokeForDPR();
   window.addEventListener('resize', () => { setFooterHeightVar(); setOverlayLift(); });
-  window.addEventListener('orientationchange', () => { setFooterHeightVar(); setOverlayLift(); });
+  window.addEventListener('orientationchange', () => { setFooterHeightVar(); setOverlayLift(); setStrokeForDPR(); });
 
-  // -------------------- Slide Content (ID-1 … ID-7) --------------------
+  /* ---------- Slide Content ---------- */
   const SLIDES = {
     'ID-1': {
       title: 'INVENTORY',
@@ -71,9 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
       img: 'image7.png', alt: 'Defects'
     }
   };
-  // -------------------------------------------------------------------
 
-  // Scanner core (BarcodeDetector → jsQR fallback)
+  /* ---------- Scanner core ---------- */
   const LOST_TIMEOUT_MS = 4000;  // keep slide 4s after last good scan
   const JSQR_TARGET_W = 480;
   const SCAN_MIN_INTERVAL = 60;
@@ -87,12 +94,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
-  // Build/destroy overlay only when needed
+  // build + mount a slide card
   function renderSlide(slide){
     infoOverlay.innerHTML = `
       <div class="info-content">
         <div class="info-text">
-          <h1 id="slide-title" class="outlined">${slide.title}</h1>
+          <h1 id="slide-title" class="outlined h1">${slide.title}</h1>
           <p class="outlined small"><span class="label">DEFINITION:</span> ${slide.def}</p>
           <p class="outlined small"><span class="label">DESCRIPTION:</span> ${slide.desc}</p>
         </div>
@@ -123,14 +130,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Unrecognized code? Hide right away.
+    // Unrecognized code? Hide immediately.
     if (text && !slide){
       activeId = null;
       hideSlide();
       return;
     }
 
-    // No code in view: wait for LOST_TIMEOUT_MS, then hide.
+    // No code in view: after timeout, hide.
     if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS){
       activeId = null; lastSeenAt = 0; hideSlide();
     }
