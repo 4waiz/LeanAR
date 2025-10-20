@@ -38,7 +38,7 @@ html,body{
   gap: min(4vw, 28px);
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(0,0,0,.25);  /* very light tint for readability */
+  background: rgba(0,0,0,.22);  /* very light tint for readability */
   backdrop-filter: blur(2px);
 }
 .info-text{ flex:1 1 60%; }
@@ -50,29 +50,26 @@ html,body{
   box-shadow: 0 8px 24px rgba(0,0,0,.35);
 }
 
-/* Outlined text (black fill + white outline) */
+/* ---- Outlined text: ONLY black fill + thin white outline ---- */
 .outlined{
-  color:#000;
-  -webkit-text-stroke: 1.5px #fff;
-  text-shadow:
-    1px  1px 0 #fff, -1px  1px 0 #fff,
-    1px -1px 0 #fff, -1px -1px 0 #fff,
-    0  1px 0 #fff,  1px 0 0 #fff, -1px 0 0 #fff, 0 -1px 0 #fff;
+  color:#000;                    /* black fill */
+  -webkit-text-stroke: 1px #fff;/* thin white outline */
+  text-shadow: none;             /* remove multi-layer shadows */
 }
-.outlined.small{ -webkit-text-stroke: 1px #fff; }
+.outlined.small{ -webkit-text-stroke: 0.8px #fff; }
 
-/* Typography */
+/* Typography - larger for Definition / Description */
 #slide-title{
-  margin:0 0 .45rem 0;
+  margin:0 0 .6rem 0;
   font-weight:900;
-  font-size: clamp(1.25rem, 4.6vw, 2.4rem);
+  font-size: clamp(1.6rem, 5.6vw, 3.1rem);
   letter-spacing:.3px;
 }
 .info-text p{
-  margin:.25rem 0;
-  font-weight:800;
-  font-size: clamp(.85rem, 2.6vw, 1.05rem);
-  line-height:1.25;
+  margin:.35rem 0;
+  font-weight:900;
+  font-size: clamp(1.05rem, 3.2vw, 1.45rem); /* bigger */
+  line-height:1.28;
 }
 .info-text .label{ text-transform:uppercase; }
 
