@@ -1,5 +1,6 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Adds interactive color-cycling on click for 3D overlays.
+// Transparent AR overlay + interactive color-cycling on click.
+// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE 3D Text.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -13,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.AFRAME && !AFRAME.components['color-cycle']) {
     AFRAME.registerComponent('color-cycle', {
       schema: {
-        colors: { default: '#d32f2f, #43a047, #1976d2, #fdd835' },
+        colors:   { default: '#d32f2f, #43a047, #1976d2, #fdd835' },
         selector: { default: '' } // optional: child targets inside this entity
       },
       init: function () {
@@ -31,7 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
         this.onClick = () => {
           this.idx = (this.idx + 1) % this.palette.length;
           const col = this.palette[this.idx];
-          this.targets.forEach(t => t.setAttribute('material', 'color', col));
+          this.targets.forEach(t => {
+            // If it's text, change the text color; otherwise, change material color
+            if (t.components && t.components.text) {
+              t.setAttribute('text', 'color', col);
+            } else {
+              t.setAttribute('material', 'color', col);
+            }
+          });
         };
 
         this.el.addEventListener('click', this.onClick);
@@ -72,10 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
     'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
     'ID-2': { mode: 'ufo3d',    name: 'UFO' },
     'ID-3': { mode: 'apple3d',  name: '3D Apple' },
-    'ID-4': { mode: 'duck2d',   name: '2D Duck'  },
+    'ID-4': { mode: 'edgeText', name: 'EDGE 3D Text' },
   };
 
-  // Scene wrapper: enables transparent renderer + mouse/touch cursor
+  // Scene wrapper: transparent renderer + mouse/touch cursor
   function sceneWrap(inner) {
     return `
       <a-scene
@@ -163,21 +171,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (def.mode === 'duck2d') {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'overlay-2d center-bob';
-      wrapper.innerHTML = `
-        <svg viewBox="0 0 128 96" width="150" height="112" xmlns="http://www.w3.org/2000/svg">
-          <g>
-            <ellipse cx="86" cy="72" rx="36" ry="10" fill="rgba(0,0,0,.15)"></ellipse>
-            <circle cx="40" cy="48" r="22" fill="#ffeb3b" stroke="#fbc02d" stroke-width="2"></circle>
-            <ellipse cx="78" cy="58" rx="38" ry="26" fill="#ffeb3b" stroke="#fbc02d" stroke-width="2"></ellipse>
-            <path d="M34 52 q8 6 18 0 q-8 -6 -18 0" fill="#ff9800" stroke="#f57c00" stroke-width="2"></path>
-            <circle cx="48" cy="44" r="3" fill="#263238"></circle>
-            <path d="M92 40 q20 12 0 24" fill="#81c784" stroke="#388e3c" stroke-width="2"></path>
-          </g>
-        </svg>`;
-      modelContainer.appendChild(wrapper);
+    if (def.mode === 'edgeText') {
+      // EDGE 3D text — color cycles via text color
+      const inner = `
+        <a-entity position="0 0 -2.5"
+                  class="clickable"
+                  color-cycle="selector: .color-part; colors: #ffffff, #ff5a2e, #00d1b2, #1976d2, #9c27b0">
+          <a-entity class="color-part"
+                    position="0 0 0"
+                    text="value: EDGE; align: center; width: 4; color: #ffffff"></a-entity>
+        </a-entity>`;
+      modelContainer.innerHTML = sceneWrap(inner);
       setCaption(def.name);
       return;
     }
@@ -218,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // iOS: proactively ask for motion permission so A-Frame doesn't prompt later
   async function requestMotionPermissionIfNeeded() {
     try {
       if (typeof DeviceMotionEvent !== 'undefined' &&
