@@ -183,22 +183,38 @@ html,body{
 }
 @keyframes spin{ 100%{ transform:translate(-50%,-50%) rotate(360deg); } }
 
-/* Start overlay */
+/* Start overlay (logo and button) */
 #start-logo{
-  position:absolute; left:50%; top:42%;
-  transform:translate(-50%,-65%);
-  width:min(220px, 50vw); max-height:20vh;
+  position:absolute; left:50%;
+  top:38%;                            /* was 42% */
+  transform:translate(-50%,-50%);     /* keep perfectly centered */
+  width:min(240px, 50vw); max-height:20vh;
   z-index:8; user-select:none; pointer-events:none;
 }
+
 .primary{
-  position:absolute; left:50%; top:50%;
-  transform:translate(-50%,-50%);
+  position:absolute; left:50%;
+  top:66%;                            /* push the button down so it doesn’t overlap */
+  transform:translateX(-50%);         /* no Y-translate so top is exact */
   border:0; border-radius:14px; padding:1rem 1.25rem;
   background:rgba(0,0,0,.55); color:#fff;
   font-weight:800; font-size:1.1rem; letter-spacing:.3px;
   z-index:8; cursor:pointer; backdrop-filter: blur(4px);
 }
-.primary:active{ transform:translate(-50%,-50%) scale(.98); }
+.primary:active{ transform:translateX(-50%) scale(.98); }
+
+/* Small phones: a bit more separation */
+@media (max-width: 480px){
+  #start-logo{ top:36%; }
+  .primary{ top:70%; }
+}
+
+/* Large desktops: keep spacing tidy */
+@media (min-width: 1200px){
+  #start-logo{ top:40%; }
+  .primary{ top:68%; }
+}
+
 
 /* Footer */
 .footer{
