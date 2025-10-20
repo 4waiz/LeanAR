@@ -63,20 +63,6 @@ p { color: #3a5b63; }
   backdrop-filter: blur(2px);
 }
 
-/* generic 2D overlay container, center & bob */
-.overlay-2d {
-  position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  pointer-events: auto;
-}
-.center-bob { animation: bob 2s ease-in-out infinite; }
-@keyframes bob {
-  0%,100% { transform: translate(-50%, -52%); }
-  50% { transform: translate(-50%, -48%); }
-}
-
 /* status */
 #scan-result {
   margin-top: 1rem; padding: .75rem 1rem;
