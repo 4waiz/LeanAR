@@ -8,30 +8,26 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Fullscreen camera + overlay -->
   <div id="video-container">
     <!-- Camera feed -->
     <div id="qr-reader">
       <video id="video" autoplay playsinline muted></video>
     </div>
 
-    <!-- INFO overlay container (emptied/filled by JS only when a valid ID is seen) -->
+    <!-- AR slide overlay (JS will inject content only when a valid ID is seen) -->
     <div id="info-overlay" class="hidden" aria-live="polite" aria-hidden="true"></div>
 
     <!-- loader spinner -->
     <div id="loader" class="hidden"></div>
 
-    <!-- EDGE logo above Start -->
+    <!-- Logo + start -->
     <img id="start-logo" src="image.png" alt="EDGE Logo" />
-
-    <!-- Start button (needed for camera permission) -->
     <button id="start-btn" class="primary">Start Scanner</button>
 
-    <!-- Status only shown for errors -->
+    <!-- Error banner -->
     <div id="scan-result" class="hidden"><p></p></div>
   </div>
 
-  <!-- Footer overlay (compact; no scrolling) -->
   <footer class="footer">
     Created by
     <a href="https://www.awaizahmed.com/" target="_blank" rel="noopener">Awaiz Ahmed</a>
