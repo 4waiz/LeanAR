@@ -57,15 +57,31 @@ document.addEventListener('DOMContentLoaded', () => {
     if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
-  // Overlay map
+  // Overlay map (now with descriptions)
   const overlays = {
-    'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
-    'ID-2': { mode: 'ufo3d',    name: 'UFO' },
-    'ID-3': { mode: 'apple3d',  name: '3D Apple' },
-    'ID-4': { mode: 'edgeCube', name: 'EDGE Cube' }
+    'ID-1': {
+      mode: 'edgeRing',
+      name: 'EDGE Ring',
+      desc: 'A twisting ring that symbolizes innovation and continuity.'
+    },
+    'ID-2': {
+      mode: 'ufo3d',
+      name: 'UFO',
+      desc: 'A playful flying saucer—tap it to change its color.'
+    },
+    'ID-3': {
+      mode: 'apple3d',
+      name: 'Apple',
+      desc: "This is an apple—it's very tasty."
+    },
+    'ID-4': {
+      mode: 'edgeCube',
+      name: 'EDGE Cube',
+      desc: 'A clean, rotating cube with an EDGE label.'
+    }
   };
 
-  // Scene wrapper (NO background attribute to avoid forcing a color)
+  // Scene wrapper (transparent + cursor for clicks)
   function sceneWrap(inner) {
     return `
       <a-scene
@@ -78,7 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ${inner}
         <a-light type="ambient" intensity="1"></a-light>
         <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
-        <a-camera wasd-controls-enabled="false" look-controls="enabled: false" position="0 0.5 2"></a-camera>
+        <!-- CAMERA centered vertically -->
+        <a-camera wasd-controls-enabled="false" look-controls="enabled: false" position="0 0 2"></a-camera>
       </a-scene>
     `;
   }
@@ -91,10 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const apply = () => {
       try {
         const r = sceneEl.renderer;
-        if (r) {
-          r.setClearColor(0x000000, 0);     // color + alpha=0
-          r.setClearAlpha?.(0);
-        }
+        if (r) { r.setClearColor(0x000000, 0); r.setClearAlpha?.(0); }
       } catch (_) {}
       const c = sceneEl.canvas || sceneEl?.renderer?.domElement;
       if (c) c.style.background = 'transparent';
@@ -103,16 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (sceneEl.hasLoaded) apply();
     else sceneEl.addEventListener('loaded', apply);
-
-    // Also when the render target is created (some devices)
     sceneEl.addEventListener('render-target-loaded', apply);
   }
 
   /* ---------- Caption helpers ---------- */
-  function setCaption(text) {
+  function setCaption(title, description) {
     let cap = document.getElementById('model-caption');
     if (!cap) { cap = document.createElement('div'); cap.id = 'model-caption'; modelContainer.appendChild(cap); }
-    cap.textContent = text;
+    cap.innerHTML = `<strong>${title}</strong><span class="desc">${description || ''}</span>`;
   }
   function clearCaption() { const cap = document.getElementById('model-caption'); if (cap) cap.remove(); }
   /* ------------------------------------ */
@@ -131,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       forceTransparent();
-      setCaption(def.name);
+      setCaption(def.name, def.desc);
       return;
     }
 
@@ -155,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       forceTransparent();
-      setCaption(def.name);
+      setCaption(def.name, def.desc);
       return;
     }
 
@@ -172,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       forceTransparent();
-      setCaption(def.name);
+      setCaption(def.name, def.desc);
       return;
     }
 
@@ -188,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       forceTransparent();
-      setCaption(def.name);
+      setCaption(def.name, def.desc);
       return;
     }
   }
@@ -260,12 +272,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handleRecognizedText(text) {
     const def = overlays[text];
-    if (def) {
-      showOverlay(def);
-    } else {
-      updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`, true);
-      clearOverlay();
-    }
+    if (def) { showOverlay(def); }
+    else { updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`, true); clearOverlay(); }
   }
 
   function registerDetection(text) {
