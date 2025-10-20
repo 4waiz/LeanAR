@@ -1,7 +1,7 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Unified desktop/mobile UI. Tap "Start Scanner" -> camera on. Transparent 3D overlay.
-// Interactive: tap models to cycle colors.
-// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE 3D Text (fixed).
+// Unified desktop/mobile. Transparent overlay over camera (no white background).
+// Interactive models: tap to cycle colors.
+// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE Cube (replaces 3D text).
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -12,44 +12,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const startBtn = document.getElementById('start-btn');
   const startLogo = document.getElementById('start-logo');
 
-  // ---------------- A-Frame component: color-cycle ----------------
+  /* ---------- A-Frame component: color-cycle ---------- */
   if (window.AFRAME && !AFRAME.components['color-cycle']) {
     AFRAME.registerComponent('color-cycle', {
-      schema: {
-        colors:   { default: '#d32f2f, #43a047, #1976d2, #fdd835' },
-        selector: { default: '' } // optional: child targets
-      },
+      schema: { colors: { default: '#d32f2f, #43a047, #1976d2, #fdd835' }, selector: { default: '' } },
       init: function () {
-        this.palette = (this.data.colors || '')
-          .split(',').map(s => s.trim()).filter(Boolean);
+        this.palette = (this.data.colors || '').split(',').map(s => s.trim()).filter(Boolean);
         if (!this.palette.length) this.palette = ['#ff0000', '#00ff00', '#0000ff'];
         this.idx = 0;
-        this.targets = this.data.selector
-          ? Array.from(this.el.querySelectorAll(this.data.selector))
-          : [this.el];
-
+        this.targets = this.data.selector ? Array.from(this.el.querySelectorAll(this.data.selector)) : [this.el];
         this.onClick = () => {
           this.idx = (this.idx + 1) % this.palette.length;
           const col = this.palette[this.idx];
-          this.targets.forEach(t => {
-            if (t.components && t.components.text) {
-              t.setAttribute('text', 'color', col);
-            } else {
-              t.setAttribute('material', 'color', col);
-            }
-          });
+          this.targets.forEach(t => t.setAttribute('material', 'color', col));
         };
         this.el.addEventListener('click', this.onClick);
       },
       remove: function () { this.el.removeEventListener('click', this.onClick); }
     });
   }
-  // ----------------------------------------------------------------
+  /* ---------------------------------------------------- */
 
   // Tuning
-  const LOST_TIMEOUT_MS = 2000;   // clear overlay if code not seen for this long
-  const JSQR_TARGET_W   = 480;    // downscale width for jsQR speed
-  const SCAN_MIN_INTERVAL = 60;   // ms between decode attempts
+  const LOST_TIMEOUT_MS = 2000;
+  const JSQR_TARGET_W = 480;
+  const SCAN_MIN_INTERVAL = 60;
 
   // State
   let scanning = false;
@@ -64,21 +51,21 @@ document.addEventListener('DOMContentLoaded', () => {
   let rafId = null;
   let canvas = null, ctx = null;
 
-  // Show status ONLY on errors (to keep UI clean)
+  // Minimal status (only on errors)
   function updateStatus(message, isError = false) {
     if (scanResultP) scanResultP.textContent = message;
     if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
-  // Overlay definitions
+  // Overlay map
   const overlays = {
     'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
     'ID-2': { mode: 'ufo3d',    name: 'UFO' },
     'ID-3': { mode: 'apple3d',  name: '3D Apple' },
-    'ID-4': { mode: 'edgeText', name: 'EDGE 3D Text' }, // fixed
+    'ID-4': { mode: 'edgeCube', name: 'EDGE Cube' } // reliable replacement for 3D text
   };
 
-  // Scene wrapper: transparent renderer + mouse/touch cursor
+  // Scene wrapper (transparent + cursor for clicks)
   function sceneWrap(inner) {
     return `
       <a-scene
@@ -96,20 +83,31 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  // Force the scene/canvas to be transparent (defensive)
+  function makeSceneTransparent() {
+    const sceneEl = modelContainer.querySelector('a-scene');
+    if (!sceneEl) return;
+    const apply = () => {
+      try {
+        if (sceneEl.renderer) {
+          sceneEl.renderer.setClearAlpha(0);
+          if (sceneEl.renderer.setClearColor) sceneEl.renderer.setClearColor(0x000000, 0);
+        }
+      } catch (_) {}
+      if (sceneEl.canvas) sceneEl.canvas.style.background = 'transparent';
+      modelContainer.style.background = 'transparent';
+    };
+    if (sceneEl.hasLoaded) apply();
+    else sceneEl.addEventListener('loaded', apply);
+  }
+
   /* ---------- Caption helpers ---------- */
   function setCaption(text) {
     let cap = document.getElementById('model-caption');
-    if (!cap) {
-      cap = document.createElement('div');
-      cap.id = 'model-caption';
-      modelContainer.appendChild(cap);
-    }
+    if (!cap) { cap = document.createElement('div'); cap.id = 'model-caption'; modelContainer.appendChild(cap); }
     cap.textContent = text;
   }
-  function clearCaption() {
-    const cap = document.getElementById('model-caption');
-    if (cap) cap.remove();
-  }
+  function clearCaption() { const cap = document.getElementById('model-caption'); if (cap) cap.remove(); }
   /* ------------------------------------ */
 
   function showOverlay(def) {
@@ -125,30 +123,31 @@ document.addEventListener('DOMContentLoaded', () => {
             color-cycle="colors: #00d1b2, #ff5a2e, #1976d2, #9c27b0"></a-torus-knot>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      makeSceneTransparent();
       setCaption(def.name);
       return;
     }
 
     if (def.mode === 'ufo3d') {
       const inner = `
-        <a-entity position="0 0 -2.5">
-          <a-entity class="clickable"
-                    color-cycle="selector: .color-part; colors: #8e9eab, #9c27b0, #43a047, #ff7043"
-                    animation="property: position; to: 0 0.2 0; dir: alternate; loop: true; dur: 1500">
-            <a-cylinder height="0.18" radius="0.9" class="color-part"
-                        material="color: #8e9eab; metalness:0.6; roughness:0.2"></a-cylinder>
-            <a-sphere radius="0.5" position="0 0.35 0" class="color-part"
-                      material="color: #cfd8dc; metalness:0.1; roughness:0.9"></a-sphere>
-            <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85" class="color-part"
-                    material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
-            <!-- nav lights unchanged -->
-            <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
-            <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
-            <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
-            <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
-          </a-entity>
+        <a-entity position="0 0 -2.5"
+                  class="clickable"
+                  color-cycle="selector: .color-part; colors: #8e9eab, #9c27b0, #43a047, #ff7043"
+                  animation="property: position; to: 0 0.2 -2.5; dir: alternate; loop: true; dur: 1500">
+          <a-cylinder height="0.18" radius="0.9" class="color-part"
+                      material="color: #8e9eab; metalness:0.6; roughness:0.2"></a-cylinder>
+          <a-sphere radius="0.5" position="0 0.35 0" class="color-part"
+                    material="color: #cfd8dc; metalness:0.1; roughness:0.9"></a-sphere>
+          <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85" class="color-part"
+                  material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
+          <!-- nav lights unchanged -->
+          <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
+          <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
+          <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
+          <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      makeSceneTransparent();
       setCaption(def.name);
       return;
     }
@@ -165,25 +164,24 @@ document.addEventListener('DOMContentLoaded', () => {
           <a-plane position="0.12 0.8 0.3" rotation="0 0 35" width="0.35" height="0.2" color="#43a047" material="side: double"></a-plane>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      makeSceneTransparent();
       setCaption(def.name);
       return;
     }
 
-    if (def.mode === 'edgeText') {
-      /* FIXED: use <a-text> primitive directly, make the text itself clickable
-         so raycaster can intersect a real mesh with the .clickable class. */
+    if (def.mode === 'edgeCube') {
+      /* Reliable replacement for text: 3D cube with EDGE label */
       const inner = `
-        <a-entity position="0 0 -2.5">
-          <a-text
-            value="EDGE"
-            align="center"
-            width="4"
-            color="#ffffff"
-            class="clickable"
-            color-cycle="colors: #ffffff, #ff5a2e, #00d1b2, #1976d2, #9c27b0">
-          </a-text>
+        <a-entity position="0 0 -2.5"
+                  class="clickable"
+                  color-cycle="selector: .color-part; colors: #00d1b2, #ff5a2e, #1976d2, #9c27b0">
+          <a-box class="color-part" width="0.9" height="0.9" depth="0.9"
+                 material="color: #00d1b2; metalness: 0.3; roughness: 0.45"
+                 animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear"></a-box>
+          <a-text value="EDGE" align="center" width="2" color="#ffffff" position="0 0 0.5"></a-text>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      makeSceneTransparent();
       setCaption(def.name);
       return;
     }
@@ -195,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loader.classList.add('hidden');
   }
 
+  /* ---------- Scanner setup ---------- */
   async function ensureJsQR() {
     if (window.jsQR) return;
     await new Promise((resolve, reject) => {
@@ -222,7 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // iOS: proactively ask for motion permission so A-Frame doesn't prompt later
   async function requestMotionPermissionIfNeeded() {
     try {
       if (typeof DeviceMotionEvent !== 'undefined' &&
@@ -257,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleRecognizedText(text) {
     const def = overlays[text];
     if (def) {
-      showOverlay(def);                // minimal UI: no non-error banners
+      showOverlay(def);
     } else {
       updateStatus(`QR "${text}" not recognized. Expect ID-1, ID-2, ID-3, or ID-4.`, true);
       clearOverlay();
@@ -267,14 +265,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function registerDetection(text) {
     const now = performance.now();
     if (text) {
-      if (text !== activeId) {
-        activeId = text; handleRecognizedText(text);
-      }
+      if (text !== activeId) { activeId = text; handleRecognizedText(text); }
       lastSeenAt = now;
-    } else {
-      if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
-        activeId = null; lastSeenAt = 0; clearOverlay();
-      }
+    } else if (activeId && (now - lastSeenAt) > LOST_TIMEOUT_MS) {
+      activeId = null; lastSeenAt = 0; clearOverlay();
     }
   }
 
@@ -282,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!scanning) return;
     let detectedText = null;
     const now = performance.now();
+
     if (now - lastScanAt >= SCAN_MIN_INTERVAL) {
       lastScanAt = now;
       try {
@@ -301,8 +296,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (code && code.data) detectedText = code.data;
           }
         }
-      } catch (e) { /* ignore single-frame errors */ }
+      } catch (_) {}
     }
+
     registerDetection(detectedText);
     rafId = requestAnimationFrame(scanLoop);
   }
