@@ -1,4 +1,3 @@
-
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
 // Overlays use A-Frame primitives (fast, works offline).
 // IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 2D Duck.
@@ -55,6 +54,23 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  /* ---------- Caption helpers ---------- */
+  function setCaption(text) {
+    let cap = document.getElementById('model-caption');
+    if (!cap) {
+      cap = document.createElement('div');
+      cap.id = 'model-caption';
+      modelContainer.appendChild(cap);
+    }
+    cap.textContent = text;
+  }
+
+  function clearCaption() {
+    const cap = document.getElementById('model-caption');
+    if (cap) cap.remove();
+  }
+  /* ------------------------------------ */
+
   function showOverlay(def) {
     modelContainer.innerHTML = '';
 
@@ -65,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         material="color: #00d1b2; metalness: 0.4; roughness: 0.3"></a-torus-knot>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      setCaption(def.name);
       return;
     }
 
@@ -81,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      setCaption(def.name);
       return;
     }
 
@@ -92,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
         <a-plane position="0.12 0.8 -2.2" rotation="0 0 35" width="0.35" height="0.2" color="#43a047" material="side: double"></a-plane>`;
       modelContainer.innerHTML = sceneWrap(inner);
+      setCaption(def.name);
       return;
     }
 
@@ -110,12 +129,14 @@ document.addEventListener('DOMContentLoaded', () => {
           </g>
         </svg>`;
       modelContainer.appendChild(wrapper);
+      setCaption(def.name);
       return;
     }
   }
 
   function clearOverlay() {
     modelContainer.innerHTML = '';
+    clearCaption();
     loader.classList.add('hidden');
   }
 
