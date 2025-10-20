@@ -1,4 +1,4 @@
-/* Reset & mobile-safe fullscreen */
+/* Reset & mobile/desktop unified fullscreen */
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
@@ -15,7 +15,7 @@ body {
   overscroll-behavior: none;
 }
 
-/* Fullscreen container uses modern viewport units to avoid iOS chrome jumps */
+/* Fullscreen container (works on iOS/Android/desktop) */
 #video-container {
   position: fixed;
   inset: 0;
@@ -88,6 +88,18 @@ body {
   animation: spin 1s linear infinite; z-index: 5;
 }
 @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+/* EDGE logo above Start button */
+#start-logo {
+  position: absolute;
+  left: 50%; top: 42%;
+  transform: translate(-50%, -65%);
+  width: min(220px, 50vw);
+  max-height: 20vh;
+  z-index: 6;
+  user-select: none;
+  pointer-events: none; /* don't block the button */
+}
 
 /* Start button floats over camera; disappears after start */
 .primary {
