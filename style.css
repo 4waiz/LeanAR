@@ -1,6 +1,13 @@
 :root{
   --footer-h: 28px;           /* set in JS */
   --overlay-lift: -4vh;       /* set in JS per screen height */
+
+  /* NEW: easy sizing controls */
+  --card-wvw: 98vw;           /* card width as viewport width */
+  --card-max-w: 1300px;       /* max card width in px */
+  --img-max-w-vw: 42vw;       /* right image max width as vw */
+  --img-max-w-px: 460px;      /* right image max width in px */
+  --img-max-h: 68vh;          /* right image max height */
   --stroke-h1: .8px;          /* tuned in JS for DPR */
   --stroke-body: .6px;        /* tuned in JS for DPR */
 }
@@ -37,22 +44,24 @@ html,body{
   pointer-events:none;
 }
 
-/* Card that JS injects */
+/* BIGGER card that JS injects */
 .info-content{
-  width:min(94vw, 1100px);
+  width:min(var(--card-wvw), var(--card-max-w));   /* <— bigger */
   display:flex; align-items:flex-start; justify-content:space-between;
-  gap: min(4vw, 28px);
-  padding: clamp(8px, 2vw, 14px);
-  border-radius: 16px;
+  gap: min(5vw, 36px);                             /* a bit wider gap */
+  padding: clamp(10px, 3vw, 20px);                 /* more padding */
+  border-radius: 18px;
   background: rgba(0,0,0,.22);
   backdrop-filter: blur(3px);
 }
 
-.info-text{ flex:1 1 62%; min-width: 0; }
-.info-image{ flex:0 0 34%; display:flex; justify-content:center; }
+.info-text{ flex:1 1 64%; min-width: 0; }
+.info-image{ flex:0 0 36%; display:flex; justify-content:center; }
 .info-image img{
-  width:auto; height:auto; max-width:min(34vw, 360px); max-height:60vh;
-  border-radius: 10px;
+  width:auto; height:auto;
+  max-width:min(var(--img-max-w-vw), var(--img-max-w-px)); /* <— bigger */
+  max-height: var(--img-max-h);                            /* <— taller */
+  border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,.32);
   object-fit: cover;
 }
@@ -69,11 +78,11 @@ html,body{
 }
 .outlined.h1{ -webkit-text-stroke: var(--stroke-h1) #fff; }
 
-/* Type scale / rhythm */
+/* Type scale / rhythm (unchanged and readable) */
 #slide-title{
   margin:0 0 .5rem 0;
   font-weight:900;
-  font-size: clamp(1.35rem, 6.2vw, 2.4rem); /* not oversized on phones */
+  font-size: clamp(1.35rem, 6.2vw, 2.4rem);
   line-height:1.15;
   text-wrap: balance;
 }
@@ -83,9 +92,7 @@ html,body{
   font-size: clamp(.98rem, 3.6vw, 1.22rem);
   line-height:1.35;
 }
-.info-text .label{
-  text-transform:uppercase;
-}
+.info-text .label{ text-transform:uppercase; }
 
 /* Error banner (only on errors) */
 #scan-result{
@@ -133,7 +140,7 @@ html,body{
 }
 .footer a{ color:inherit; text-decoration:underline; }
 
-/* Slightly tighter image on very narrow phones */
+/* Narrow phones: keep image reasonable */
 @media (max-width: 420px){
-  .info-image img{ max-width: 32vw; }
+  .info-image img{ max-width: 36vw; }
 }
