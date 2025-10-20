@@ -1,7 +1,7 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Unified desktop/mobile. Transparent overlay over camera (no white background).
+// Transparent overlay over camera (no white background).
 // Interactive models: tap to cycle colors.
-// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE Cube (replaces 3D text).
+// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 EDGE Cube.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -62,17 +62,17 @@ document.addEventListener('DOMContentLoaded', () => {
     'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
     'ID-2': { mode: 'ufo3d',    name: 'UFO' },
     'ID-3': { mode: 'apple3d',  name: '3D Apple' },
-    'ID-4': { mode: 'edgeCube', name: 'EDGE Cube' } // reliable replacement for 3D text
+    'ID-4': { mode: 'edgeCube', name: 'EDGE Cube' }
   };
 
-  // Scene wrapper (transparent + cursor for clicks)
+  // Scene wrapper (NO background attribute to avoid forcing a color)
   function sceneWrap(inner) {
     return `
       <a-scene
         embedded
         renderer="alpha: true; antialias: true"
-        background="color: #0000"
         vr-mode-ui="enabled: false"
+        style="background: transparent"
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable">
         ${inner}
@@ -83,22 +83,29 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
-  // Force the scene/canvas to be transparent (defensive)
-  function makeSceneTransparent() {
+  // Hard-force transparency after the scene and canvas are ready (covers iOS Safari)
+  function forceTransparent() {
     const sceneEl = modelContainer.querySelector('a-scene');
     if (!sceneEl) return;
+
     const apply = () => {
       try {
-        if (sceneEl.renderer) {
-          sceneEl.renderer.setClearAlpha(0);
-          if (sceneEl.renderer.setClearColor) sceneEl.renderer.setClearColor(0x000000, 0);
+        const r = sceneEl.renderer;
+        if (r) {
+          r.setClearColor(0x000000, 0);     // color + alpha=0
+          r.setClearAlpha?.(0);
         }
       } catch (_) {}
-      if (sceneEl.canvas) sceneEl.canvas.style.background = 'transparent';
+      const c = sceneEl.canvas || sceneEl?.renderer?.domElement;
+      if (c) c.style.background = 'transparent';
       modelContainer.style.background = 'transparent';
     };
+
     if (sceneEl.hasLoaded) apply();
     else sceneEl.addEventListener('loaded', apply);
+
+    // Also when the render target is created (some devices)
+    sceneEl.addEventListener('render-target-loaded', apply);
   }
 
   /* ---------- Caption helpers ---------- */
@@ -123,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             color-cycle="colors: #00d1b2, #ff5a2e, #1976d2, #9c27b0"></a-torus-knot>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
-      makeSceneTransparent();
+      forceTransparent();
       setCaption(def.name);
       return;
     }
@@ -147,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <a-sphere radius="0.06" position="0 0.02 -0.6" color="#ff5252"></a-sphere>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
-      makeSceneTransparent();
+      forceTransparent();
       setCaption(def.name);
       return;
     }
@@ -155,22 +162,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (def.mode === 'apple3d') {
       const inner = `
         <a-entity position="0 0 -2.5">
-          <a-sphere radius="0.7" color="#d32f2f"
+          <a-sphere radius="0.7" color="#43a047"
                     class="clickable"
-                    color-cycle="colors: #d32f2f, #43a047, #1976d2, #fdd835">
+                    color-cycle="colors: #43a047, #d32f2f, #1976d2, #fdd835">
             <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
           </a-sphere>
           <a-cylinder position="0 0.65 0.3" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
           <a-plane position="0.12 0.8 0.3" rotation="0 0 35" width="0.35" height="0.2" color="#43a047" material="side: double"></a-plane>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
-      makeSceneTransparent();
+      forceTransparent();
       setCaption(def.name);
       return;
     }
 
     if (def.mode === 'edgeCube') {
-      /* Reliable replacement for text: 3D cube with EDGE label */
       const inner = `
         <a-entity position="0 0 -2.5"
                   class="clickable"
@@ -181,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <a-text value="EDGE" align="center" width="2" color="#ffffff" position="0 0 0.5"></a-text>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
-      makeSceneTransparent();
+      forceTransparent();
       setCaption(def.name);
       return;
     }
