@@ -15,19 +15,8 @@
       <video id="video" autoplay playsinline muted></video>
     </div>
 
-    <!-- INFO overlay (text + image on the right) -->
-    <div id="info-overlay" class="hidden" aria-live="polite">
-      <div class="info-content">
-        <div class="info-text">
-          <h1 id="slide-title" class="outlined"></h1>
-          <p class="outlined small"><span class="label">Definition:</span> <span id="slide-def"></span></p>
-          <p class="outlined small"><span class="label">Description:</span> <span id="slide-desc"></span></p>
-        </div>
-        <div class="info-image">
-          <img id="slide-image" alt="" />
-        </div>
-      </div>
-    </div>
+    <!-- INFO overlay container (emptied/filled by JS only when a valid ID is seen) -->
+    <div id="info-overlay" class="hidden" aria-live="polite" aria-hidden="true"></div>
 
     <!-- loader spinner -->
     <div id="loader" class="hidden"></div>

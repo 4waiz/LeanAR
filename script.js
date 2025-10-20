@@ -1,13 +1,9 @@
 // 7-ID QR overlay: shows slide text (outlined) + right-side image over live camera.
-// Desktop & mobile unified. Paste images as image1.png ... image7.png in the same folder.
+// Overlay is created ONLY when a valid ID is seen; hidden otherwise.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
   const infoOverlay = document.getElementById('info-overlay');
-  const titleEl = document.getElementById('slide-title');
-  const defEl = document.getElementById('slide-def');
-  const descEl = document.getElementById('slide-desc');
-  const imgEl = document.getElementById('slide-image');
 
   const loader = document.getElementById('loader');
   const startBtn = document.getElementById('start-btn');
@@ -16,24 +12,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanResultP = document.querySelector('#scan-result p');
   const scanResultDiv = document.getElementById('scan-result');
 
-  // Keep caption clear of footer & lift overlay on phones
+  // Keep overlay clear of footer & lift on phones
   function setFooterHeightVar(){
     const h = footer?.offsetHeight || 28;
     document.documentElement.style.setProperty('--footer-h', `${h}px`);
   }
   function setOverlayLift(){
     const h = window.innerHeight;
-    let lift = -4; // default -4vh
-    if (h < 820) lift = -6;
-    if (h < 740) lift = -8;
-    if (h < 680) lift = -9.5;
+    let lift = -4; if (h < 820) lift = -6; if (h < 740) lift = -8; if (h < 680) lift = -9.5;
     document.documentElement.style.setProperty('--overlay-lift', `${lift}vh`);
   }
   setFooterHeightVar(); setOverlayLift();
   window.addEventListener('resize', () => { setFooterHeightVar(); setOverlayLift(); });
   window.addEventListener('orientationchange', () => { setFooterHeightVar(); setOverlayLift(); });
 
-  // -------------------- Slide Content (pages 1–7) --------------------
+  // -------------------- Slide Content (ID-1 … ID-7) --------------------
   const SLIDES = {
     'ID-1': {
       title: 'INVENTORY',
@@ -81,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // -------------------------------------------------------------------
 
   // Scanner core (BarcodeDetector → jsQR fallback)
-  const LOST_TIMEOUT_MS = 4000;  // <-- Keep slide visible for 4s after last good scan
+  const LOST_TIMEOUT_MS = 4000;  // keep slide 4s after last good scan
   const JSQR_TARGET_W = 480;
   const SCAN_MIN_INTERVAL = 60;
 
@@ -94,26 +87,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
-  function showSlide(slide){
-    if (!slide){ hideSlide(); return; }
-    titleEl.textContent = slide.title;
-    defEl.textContent = slide.def;
-    descEl.textContent = slide.desc;
-    imgEl.src = slide.img;
-    imgEl.alt = slide.alt || slide.title;
+  // Build/destroy overlay only when needed
+  function renderSlide(slide){
+    infoOverlay.innerHTML = `
+      <div class="info-content">
+        <div class="info-text">
+          <h1 id="slide-title" class="outlined">${slide.title}</h1>
+          <p class="outlined small"><span class="label">DEFINITION:</span> ${slide.def}</p>
+          <p class="outlined small"><span class="label">DESCRIPTION:</span> ${slide.desc}</p>
+        </div>
+        <div class="info-image">
+          <img id="slide-image" src="${slide.img}" alt="${slide.alt || slide.title}" />
+        </div>
+      </div>`;
     infoOverlay.classList.remove('hidden');
+    infoOverlay.setAttribute('aria-hidden','false');
   }
   function hideSlide(){
     infoOverlay.classList.add('hidden');
-    titleEl.textContent = '';
-    defEl.textContent = '';
-    descEl.textContent = '';
-    imgEl.removeAttribute('src');
-    imgEl.alt = '';
+    infoOverlay.setAttribute('aria-hidden','true');
+    infoOverlay.innerHTML = '';
   }
 
   // Only show overlay when a valid ID-x is detected.
-  // If we see some other QR text, hide immediately.
   function registerDetection(text){
     const now = performance.now();
     const slide = text ? SLIDES[text] : null;
@@ -121,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (slide){
       if (text !== activeId){
         activeId = text;
-        showSlide(slide);
+        renderSlide(slide);
       }
       lastSeenAt = now;
       return;
@@ -172,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     video.srcObject = streamRef;
     video.setAttribute('playsinline','true');
     await video.play();
-    hideSlide(); // ensure overlay is hidden right at start
+    hideSlide(); // ensure overlay is hidden at start
   }
 
   function stopCamera(){
@@ -236,6 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }finally{
       loader.classList.add('hidden');
     }
+  }
+
+  function updateStatus(message, isError = false){
+    if (scanResultP) scanResultP.textContent = message || '';
+    if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
   startBtn.addEventListener('click', startScanner);
