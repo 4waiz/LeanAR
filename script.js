@@ -1,7 +1,5 @@
 // EDGE 3D QR Scanner (BarcodeDetector + jsQR fallback)
-// Overlays use A-Frame primitives (fast, works offline).
-// IDs: ID-1 EDGE Ring, ID-2 UFO, ID-3 Apple, ID-4 2D Duck.
-// If QR disappears for 2s => overlay is removed and scanning continues.
+// Adds interactive color-cycling on click for 3D overlays.
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
@@ -11,10 +9,44 @@ document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('loader');
   const startBtn = document.getElementById('start-btn');
 
+  // ---------------- A-Frame component: color-cycle ----------------
+  if (window.AFRAME && !AFRAME.components['color-cycle']) {
+    AFRAME.registerComponent('color-cycle', {
+      schema: {
+        colors: { default: '#d32f2f, #43a047, #1976d2, #fdd835' },
+        selector: { default: '' } // optional: child targets inside this entity
+      },
+      init: function () {
+        this.palette = (this.data.colors || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        if (!this.palette.length) this.palette = ['#ff0000', '#00ff00', '#0000ff'];
+
+        this.idx = 0;
+        this.targets = this.data.selector
+          ? Array.from(this.el.querySelectorAll(this.data.selector))
+          : [this.el];
+
+        this.onClick = () => {
+          this.idx = (this.idx + 1) % this.palette.length;
+          const col = this.palette[this.idx];
+          this.targets.forEach(t => t.setAttribute('material', 'color', col));
+        };
+
+        this.el.addEventListener('click', this.onClick);
+      },
+      remove: function () {
+        this.el.removeEventListener('click', this.onClick);
+      }
+    });
+  }
+  // ----------------------------------------------------------------
+
   // Tuning
-  const LOST_TIMEOUT_MS = 2000; // clear overlay if code not seen for this long
-  const JSQR_TARGET_W    = 480; // downscale width for jsQR speed
-  const SCAN_MIN_INTERVAL = 60; // ms between decode attempts
+  const LOST_TIMEOUT_MS = 2000;  // clear overlay if code not seen for this long
+  const JSQR_TARGET_W   = 480;   // downscale width for jsQR speed
+  const SCAN_MIN_INTERVAL = 60;  // ms between decode attempts
 
   // State
   let scanning = false;
@@ -35,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     scanResultDiv.style.color = isError ? '#D8000C' : '#0d47a1';
   }
 
-  // Overlay set
+  // Overlay definitions
   const overlays = {
     'ID-1': { mode: 'edgeRing', name: 'EDGE Ring' },
     'ID-2': { mode: 'ufo3d',    name: 'UFO' },
@@ -43,9 +75,16 @@ document.addEventListener('DOMContentLoaded', () => {
     'ID-4': { mode: 'duck2d',   name: '2D Duck'  },
   };
 
+  // Scene wrapper: enables transparent renderer + mouse/touch cursor
   function sceneWrap(inner) {
     return `
-      <a-scene embedded renderer="alpha: true; antialias: true" background="color: #0000" vr-mode-ui="enabled: false">
+      <a-scene
+        embedded
+        renderer="alpha: true; antialias: true"
+        background="color: #0000"
+        vr-mode-ui="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable">
         ${inner}
         <a-light type="ambient" intensity="1"></a-light>
         <a-light type="directional" intensity="0.7" position="-1 1 2"></a-light>
@@ -64,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     cap.textContent = text;
   }
-
   function clearCaption() {
     const cap = document.getElementById('model-caption');
     if (cap) cap.remove();
@@ -77,8 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (def.mode === 'edgeRing') {
       const inner = `
         <a-entity position="0 0 -2.5" animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear">
-          <a-torus-knot p="2" q="3" radius="0.9" radius-tubular="0.08"
-                        material="color: #00d1b2; metalness: 0.4; roughness: 0.3"></a-torus-knot>
+          <a-torus-knot
+            class="clickable"
+            p="2" q="3" radius="0.9" radius-tubular="0.08"
+            material="color: #00d1b2; metalness: 0.4; roughness: 0.3"
+            color-cycle="colors: #00d1b2, #ff5a2e, #1976d2, #9c27b0"></a-torus-knot>
         </a-entity>`;
       modelContainer.innerHTML = sceneWrap(inner);
       setCaption(def.name);
@@ -87,11 +128,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (def.mode === 'ufo3d') {
       const inner = `
-        <a-entity position="0 0 -2.5" animation="property: position; to: 0 0.2 -2.5; dir: alternate; loop: true; dur: 1500">
-          <a-cylinder height="0.18" radius="0.9" color="#8e9eab" material="metalness:0.6; roughness:0.2"></a-cylinder>
-          <a-sphere radius="0.5" position="0 0.35 0" color="#cfd8dc" material="metalness:0.1; roughness:0.9"></a-sphere>
-          <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85"
+        <a-entity position="0 0 -2.5"
+                  class="clickable"
+                  color-cycle="selector: .color-part; colors: #8e9eab, #9c27b0, #43a047, #ff7043"
+                  animation="property: position; to: 0 0.2 -2.5; dir: alternate; loop: true; dur: 1500">
+          <a-cylinder height="0.18" radius="0.9" class="color-part"
+                      material="color: #8e9eab; metalness:0.6; roughness:0.2"></a-cylinder>
+          <a-sphere radius="0.5" position="0 0.35 0" class="color-part"
+                    material="color: #cfd8dc; metalness:0.1; roughness:0.9"></a-sphere>
+          <a-ring position="0 0.05 0" radius-inner="0.25" radius-outer="0.85" class="color-part"
                   material="color:#4dd0e1; opacity:0.6; transparent:true"></a-ring>
+          <!-- keep nav lights constant -->
           <a-sphere radius="0.06" position="0.6 0.02 0" color="#ff5252"></a-sphere>
           <a-sphere radius="0.06" position="-0.6 0.02 0" color="#ff5252"></a-sphere>
           <a-sphere radius="0.06" position="0 0.02 0.6" color="#ff5252"></a-sphere>
@@ -104,7 +151,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (def.mode === 'apple3d') {
       const inner = `
-        <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f">
+        <a-sphere position="0 0 -2.5" radius="0.7" color="#d32f2f"
+                  class="clickable"
+                  color-cycle="colors: #d32f2f, #43a047, #1976d2, #fdd835">
           <a-animation attribute="rotation" to="0 360 0" dur="15000" repeat="indefinite" easing="linear"></a-animation>
         </a-sphere>
         <a-cylinder position="0 0.65 -2.2" radius="0.05" height="0.25" color="#6d4c41"></a-cylinder>
@@ -169,8 +218,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // iOS: proactively ask for motion permission on user tap,
-  // so any internal A-Frame UI doesn't need to show its own dialog.
   async function requestMotionPermissionIfNeeded() {
     try {
       if (typeof DeviceMotionEvent !== 'undefined' &&
@@ -263,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not supported in this browser.');
       }
-      // Request motion permission proactively on iOS
       await requestMotionPermissionIfNeeded();
 
       updateStatus('Starting camera...');
