@@ -1,4 +1,7 @@
-:root { --footer-h: 28px; }  /* measured in JS and updated */
+:root {
+  --footer-h: 28px;      /* measured in JS and updated */
+  --caption-extra: 56px; /* extra lift; tuned in JS for small screens */
+}
 
 * { box-sizing: border-box; }
 html, body {
@@ -28,7 +31,7 @@ html, body {
 #model-caption {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 8px) + var(--footer-h, 28px) + 12px);
+  bottom: calc(env(safe-area-inset-bottom, 8px) + var(--footer-h, 28px) + var(--caption-extra, 56px));
   transform: translateX(-50%);
   padding: .55rem .75rem;
   border-radius: 10px;
@@ -39,7 +42,7 @@ html, body {
   backdrop-filter: blur(2px);
   text-align: center;
   max-width: min(92vw, 520px);
-  overflow-wrap: anywhere;  /* robust wrapping on mobile */
+  overflow-wrap: anywhere;
 }
 #model-caption strong {
   display: block;
