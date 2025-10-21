@@ -14,7 +14,7 @@
 
   /* <<< transparency controls >>> */
   --card-rgb: 255,255,255;    /* 255,255,255 = light glass | 0,0,0 = dark glass */
-  --card-alpha: 0.18;         /* 0 = transparent, 0.5 = medium, 0.9 = solid */
+  --card-alpha: 0.5;         /* 0 = transparent, 0.5 = medium, 0.9 = solid */
   --card-blur: 6px;           /* set 0px to remove blur */
 }
 
