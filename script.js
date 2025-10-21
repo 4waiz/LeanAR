@@ -77,6 +77,13 @@ document.addEventListener('DOMContentLoaded', () => {
       def: 'Products or materials that do not meet quality standards, requiring rework, repairs, or disposal.',
       desc: 'Defects are costly because they lead to wasted materials, labor, and time. Rework consumes resources that could have been used for new production, while scrap results in complete loss. Defects can also harm customer satisfaction, leading to returns, warranty claims, or reputational damage.',
       img: 'image7.png', alt: 'Defects'
+    },
+    'ID-8': {
+    title: 'SKILLS NOT USED',
+    def: 'The failure to fully utilize the skills, knowledge, and creativity of employees, along with the failure to leverage available data.',
+    desc: 'This type of waste occurs when companies do not take advantage of the full potential of their workforce and the tools or data at their disposal. Employees may not be involved in decision-making, problem-solving, or process optimization efforts. Additionally, valuable knowledge from data may remain unused or unavailable, leading to missed opportunities for process improvements or decision-making insights.',
+    img: 'image8.png',           // put your slide image here
+    alt: 'Skills Not Used'
     }
   };
 
