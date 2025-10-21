@@ -212,3 +212,21 @@ html,body{
   padding:.25rem 0;
 }
 .footer a{ color:inherit; text-decoration:underline; }
+/* --- MOBILE: push the card lower; avoid overlap with the top UI --- */
+:root{
+  --mobile-top-gap: 32px; /* tweak this: bigger = farther down */
+}
+
+@media (max-width: 600px){
+  #info-overlay{
+    align-items: flex-start;
+    transform: none !important; /* cancel the negative lift from desktop */
+    padding-top: calc(env(safe-area-inset-top) + var(--mobile-top-gap));
+    padding-bottom: calc(env(safe-area-inset-bottom) + var(--footer-h) + 10px);
+  }
+
+  /* keep the card tight, no extra top margin needed */
+  .info-content{
+    margin-top: 0;
+  }
+}
