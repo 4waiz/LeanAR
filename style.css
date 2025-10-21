@@ -7,12 +7,12 @@
   --card-wvw: 98vw;
   --card-max-w: 1280px;
 
-  /* image sizing (mobile defaults; overridden on larger screens below) */
-  --img-max-w-vw: 42vw;
-  --img-max-w-px: 460px;
-  --img-max-h: 68vh;
+  /* image sizing (tablet/desktop defaults) */
+  --img-max-w-vw: 30vw;
+  --img-max-w-px: 420px;
+  --img-max-h: 72vh;
 
-  /* <<< transparency controls >>> */
+  /* transparency controls */
   --card-rgb: 255,255,255;    /* 255,255,255 = light glass | 0,0,0 = dark glass */
   --card-alpha: 0.5;         /* 0 = transparent, 0.5 = medium, 0.9 = solid */
   --card-blur: 6px;           /* set 0px to remove blur */
@@ -57,7 +57,6 @@ html,body{
   gap:min(5vw, 36px);
   padding:clamp(12px, 3.2vw, 24px);
   border-radius:20px;
-
   background: rgba(var(--card-rgb), var(--card-alpha));
   backdrop-filter: blur(var(--card-blur)) saturate(1.05);
   border:none;
@@ -65,13 +64,12 @@ html,body{
 }
 
 .info-text{
-  flex:1 1 64%;
+  flex:1 1 72%;
   min-width:0;
   color:#111;
 }
-
 .info-image{
-  flex:0 0 36%;
+  flex:0 0 28%;
   display:flex; justify-content:center; align-items:flex-start;
 }
 .info-image img{
@@ -88,7 +86,6 @@ html,body{
   color:#111 !important;
   -webkit-text-stroke: 0 !important;
   text-shadow:none !important;
-
   word-break: normal;
   overflow-wrap: break-word;
   hyphens: none;
@@ -97,69 +94,76 @@ html,body{
 }
 .outlined.h1{ -webkit-text-stroke: 0 !important; }
 
-/* Base type (mobile) */
+/* Base type */
 #slide-title{
   margin:0 0 .55rem 0;
   font-weight:900;
-  font-size: clamp(1.45rem, 6.4vw, 2.5rem);
-  line-height:1.18;
+  font-size: clamp(1.45rem, 4vw, 3.2rem);
+  line-height:1.16;
   text-wrap: balance;
 }
 .info-text p{
   margin:.55rem 0;
   font-weight:800;
-  font-size: clamp(1.05rem, 3.9vw, 1.28rem);
-  line-height:1.42;
+  font-size: clamp(1.05rem, 1.8vw, 1.6rem);
+  line-height:1.44;
 }
 .info-text .label{
   text-transform:uppercase;
   font-weight:900;
 }
 
-/* ---------- Tablet: give text more room + bigger type ---------- */
+/* ---------- Tablet up ---------- */
 @media (min-width: 768px){
-  .info-text{ flex:1 1 70%; }
-  .info-image{ flex:0 0 30%; }
-  .info-image img{
-    max-width:min(30vw, 420px);
-    max-height:72vh;
-  }
-
-  #slide-title{
-    font-size: clamp(2rem, 3.8vw, 3rem);
-    line-height:1.16;
-  }
-  .info-text p{
-    font-size: clamp(1.15rem, 2.1vw, 1.5rem);
-    line-height:1.46;
-  }
   .info-content{
-    gap:min(4vw, 40px);
     padding:clamp(16px, 2.6vw, 28px);
-    --card-wvw: 98vw;           /* keep big card */
-    --card-max-w: 1400px;       /* allow wider on tablets/desktops */
+    gap:min(4vw, 40px);
+    --card-max-w: 1400px;
   }
 }
 
-/* ---------- Desktop/Laptop: text dominates even more ---------- */
+/* ---------- Desktop/Laptop ---------- */
 @media (min-width: 1200px){
-  .info-text{ flex:1 1 72%; }
-  .info-image{ flex:0 0 28%; }
-  .info-image img{
-    max-width:min(28vw, 440px);
-    max-height:74vh;
+  .info-text{ flex:1 1 74%; }
+  .info-image{ flex:0 0 26%; }
+  .info-image img{ max-width:min(26vw, 440px); max-height:74vh; }
+  .info-content{ --card-max-w: 1500px; gap:min(3.6vw, 44px); }
+}
+
+/* ---------- PHONE FIXES: fit above footer & avoid overlap ---------- */
+@media (max-width: 600px){
+  /* put card near the top so full content fits */
+  #info-overlay{
+    align-items:flex-start;
+    padding-top: calc(env(safe-area-inset-top) + 10px);
   }
 
+  /* stack content; image below text to save vertical space */
+  .info-content{
+    width:96vw;
+    max-height: calc(100dvh - var(--footer-h) - env(safe-area-inset-bottom) - 22px);
+    overflow:hidden; /* no internal scroll; everything sized to fit */
+    flex-direction: column;
+    gap:10px;
+    border-radius:16px;
+  }
+  .info-text{ flex:0 0 auto; }
+  .info-image{ flex:0 0 auto; }
+  .info-image img{
+    max-width: 100%;
+    max-height: 26vh;   /* small, so text has room */
+  }
+
+  /* compact, readable type */
   #slide-title{
-    font-size: clamp(2.2rem, 3.2vw, 3.4rem);
+    font-size: 1.35rem;
+    line-height:1.18;
+    margin-bottom:.4rem;
   }
   .info-text p{
-    font-size: clamp(1.25rem, 1.8vw, 1.7rem);
-  }
-
-  .info-content{
-    gap:min(3.6vw, 44px);
-    --card-max-w: 1500px;
+    font-size: 0.98rem;
+    line-height:1.35;
+    margin:.4rem 0;
   }
 }
 
@@ -185,17 +189,14 @@ html,body{
 
 /* Start overlay (logo and button) */
 #start-logo{
-  position:absolute; left:50%;
-  top:38%;                            /* was 42% */
-  transform:translate(-50%,-50%);     /* keep perfectly centered */
+  position:absolute; left:50%; top:38%;
+  transform:translate(-50%,-50%);
   width:min(240px, 50vw); max-height:20vh;
   z-index:8; user-select:none; pointer-events:none;
 }
-
 .primary{
-  position:absolute; left:50%;
-  top:66%;                            /* push the button down so it doesn’t overlap */
-  transform:translateX(-50%);         /* no Y-translate so top is exact */
+  position:absolute; left:50%; top:66%;
+  transform:translateX(-50%);
   border:0; border-radius:14px; padding:1rem 1.25rem;
   background:rgba(0,0,0,.55); color:#fff;
   font-weight:800; font-size:1.1rem; letter-spacing:.3px;
@@ -203,24 +204,11 @@ html,body{
 }
 .primary:active{ transform:translateX(-50%) scale(.98); }
 
-/* Small phones: a bit more separation */
-@media (max-width: 480px){
-  #start-logo{ top:36%; }
-  .primary{ top:70%; }
-}
-
-/* Large desktops: keep spacing tidy */
-@media (min-width: 1200px){
-  #start-logo{ top:40%; }
-  .primary{ top:68%; }
-}
-
-
 /* Footer */
 .footer{
   position:fixed; bottom:max(6px, env(safe-area-inset-bottom));
   left:0; right:0; text-align:center; z-index:2;
-  font-weight:600; color:#ffffff; line-height:1; font-size:.98rem;
+  font-weight:600; color:#ffffff; line-height:1; font-size:.92rem;
   padding:.25rem 0;
 }
 .footer a{ color:inherit; text-decoration:underline; }
