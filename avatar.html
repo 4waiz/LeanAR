@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDGE Avatar - Always Alive</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 500px;
+        }
+
+        #avatar-container {
+            width: 100%;
+            height: 400px; 
+            background-color: #e5e5e5;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+
+        #loading-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            font-weight: bold;
+        }
+
+        button {
+            background-color: #ff7a1a;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover { background-color: #d6600d; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        #status { margin-top: 10px; font-size: 0.9rem; color: #555; height: 20px; }
+        
+        #parts-list { 
+            font-size: 0.75rem; 
+            color: #888; 
+            margin-top: 10px; 
+            text-align: left;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 80px;
+            overflow-y: auto;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div class="container">
+        <h2>EDGE Avatar</h2>
+        
+        <div id="avatar-container">
+            <div id="loading-text">Loading Model...</div>
+        </div>
+
+        <button id="talk-btn">Start Talking (20s)</button>
+        <div id="status">Idle (Blinking Active)</div>
+        <div id="parts-list">Scanning model...</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const MODEL_PATH = './muhammad.glb'; 
+        
+        let scene, camera, renderer, model, controls;
+        let isTalking = false;
+        
+        let mouthParts = []; 
+        let eyeParts = []; 
+        
+        // Blink State
+        let nextBlinkTime = 0;
+
+        const container = document.getElementById('avatar-container');
+        const btn = document.getElementById('talk-btn');
+        const statusText = document.getElementById('status');
+        const partsList = document.getElementById('parts-list');
+        const loadingText = document.getElementById('loading-text');
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xe5e5e5);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 1.7, 0.6); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(1, 2, 3);
+            scene.add(dirLight);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 1.6, 0); 
+            controls.update();
+
+            const loader = new GLTFLoader();
+            loader.load(MODEL_PATH, (gltf) => {
+                model = gltf.scene;
+                scene.add(model);
+                loadingText.style.display = 'none';
+
+                // 1. MOUTH (Common names)
+                const mouthNames = ['jawOpen', 'mouthOpen', 'viseme_aa', 'viseme_OH', 'MouthOpen', 'v_aa'];
+                
+                // 2. EYES (Common names)
+                const eyeNames = ['eyeBlinkLeft', 'eyeBlinkRight', 'eyesClosed', 'blink', 'EyeBlink_L', 'EyeBlink_R'];
+
+                let foundLog = [];
+
+                model.traverse((child) => {
+                    if (child.isMesh && child.morphTargetDictionary) {
+                        
+                        // Check Mouth
+                        for (let name of mouthNames) {
+                            if (child.morphTargetDictionary[name] !== undefined) {
+                                mouthParts.push({ mesh: child, index: child.morphTargetDictionary[name] });
+                                if (!foundLog.includes("Mouth: " + child.name)) foundLog.push("Mouth: " + child.name);
+                                break; 
+                            }
+                        }
+
+                        // Check Eyes
+                        for (let name of eyeNames) {
+                            if (child.morphTargetDictionary[name] !== undefined) {
+                                eyeParts.push({ mesh: child, index: child.morphTargetDictionary[name] });
+                                if (!foundLog.includes("Eyes: " + child.name)) foundLog.push("Eyes: " + child.name);
+                            }
+                        }
+                    }
+                });
+
+                partsList.innerHTML = foundLog.length > 0 
+                    ? "<strong>Active Parts:</strong><br>" + foundLog.join("<br>")
+                    : "Error: No morph targets found.";
+
+                // Camera Fix
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const center = box.getCenter(new THREE.Vector3());
+                const faceHeight = box.max.y - (size.y * 0.12); 
+                camera.position.set(center.x, faceHeight, center.z + 0.55); 
+                controls.target.set(center.x, faceHeight, center.z);
+                controls.update();
+
+            }, undefined, (error) => {
+                console.error(error);
+                loadingText.textContent = "Error loading GLB.";
+            });
+
+            btn.addEventListener('click', startTalking);
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+        }
+
+        function startTalking() {
+            if (isTalking) return; 
+
+            isTalking = true;
+            btn.disabled = true;
+            
+            let timeLeft = 20;
+            btn.textContent = `Talking... (${timeLeft})`;
+            statusText.textContent = "Status: Speaking";
+
+            const interval = setInterval(() => {
+                timeLeft--;
+                btn.textContent = `Talking... (${timeLeft})`;
+                if (timeLeft <= 0) clearInterval(interval);
+            }, 1000);
+
+            setTimeout(() => {
+                isTalking = false;
+                btn.disabled = false;
+                btn.textContent = "Start Talking (20s)";
+                statusText.textContent = "Status: Idle (Blinking Active)";
+                
+                // Reset Head Position
+                if(model) {
+                    model.rotation.y = 0;
+                    model.rotation.x = 0;
+                }
+                // Close Mouth
+                mouthParts.forEach(p => p.mesh.morphTargetInfluences[p.index] = 0);
+
+            }, 20000);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+
+            const now = Date.now();
+            const time = now * 0.001;
+
+            if (model) {
+                // ------------------------------------
+                // 1. EYE BLINKING (RUNS ALWAYS)
+                // ------------------------------------
+                let blinkValue = 0;
+                
+                // If it's time to blink
+                if (now > nextBlinkTime) {
+                    // Blink takes 150ms
+                    if (now < nextBlinkTime + 150) {
+                        blinkValue = 1; // Closed
+                    } else {
+                        // Finished blinking, set random next time (2-5 seconds)
+                        nextBlinkTime = now + (Math.random() * 3000) + 2000;
+                    }
+                }
+
+                // Apply blink to eyes
+                eyeParts.forEach(part => {
+                    part.mesh.morphTargetInfluences[part.index] = blinkValue;
+                });
+
+                // ------------------------------------
+                // 2. TALKING & HEAD MOVEMENT (IF ACTIVE)
+                // ------------------------------------
+                if (isTalking) {
+                    // Head Bobbing
+                    model.rotation.y = Math.sin(time * 1.5) * 0.1; 
+                    model.rotation.x = Math.sin(time * 2) * 0.03; 
+
+                    // Mouth Movement (Sine wave limited to 40%)
+                    const mouthValue = ((Math.sin(now * 0.02) + 1) / 2) * 0.4;
+                    mouthParts.forEach(part => {
+                        part.mesh.morphTargetInfluences[part.index] = mouthValue;
+                    });
+                } else {
+                    // Smooth Reset Head if stopped
+                   model.rotation.y = THREE.MathUtils.lerp(model.rotation.y, 0, 0.1);
+                   model.rotation.x = THREE.MathUtils.lerp(model.rotation.x, 0, 0.1);
+                   
+                   // Smooth Close Mouth
+                   mouthParts.forEach(part => {
+                        const current = part.mesh.morphTargetInfluences[part.index];
+                        part.mesh.morphTargetInfluences[part.index] = THREE.MathUtils.lerp(current, 0, 0.1);
+                   });
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
