@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let mouthParts = [], eyeParts = [];
   let nextBlinkTime = 0;
   let isSpeaking = false;
+  let speechFinished = false;  // Track if speech has completed
   let speechSynth = window.speechSynthesis;
   let currentUtterance = null;
 
@@ -225,9 +226,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       currentUtterance.onend = () => {
         isSpeaking = false;
+        speechFinished = true;  // Mark speech as complete
         clearInterval(keepAlive);
+        // Check if we should hide the slide now
+        checkHideSlide();
       };
     }, 100);
+  }
+
+  // Check if slide should be hidden (only after speech finishes and no active QR)
+  function checkHideSlide() {
+    if (speechFinished && activeId && !currentlySeesQR) {
+      activeId = null;
+      hideSlide();
+    }
   }
 
   function stopSpeaking() {
@@ -365,14 +377,13 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   /* ---------- Scanner core ---------- */
-  const LOST_TIMEOUT_MS = 4000;
   const JSQR_TARGET_W = 480;
   const SCAN_MIN_INTERVAL = 60;
 
   let scanning = false,
     activeId = null,
-    lastSeenAt = 0,
     lastScanAt = 0;
+  let currentlySeesQR = false;  // Track if QR is currently visible
   let streamRef = null,
     useBarcodeDetector = false,
     detector = null,
@@ -413,30 +424,38 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Only show overlay when a valid ID-x is detected.
+  // Slide stays until speech finishes OR a new QR code is scanned.
   function registerDetection(text) {
-    const now = performance.now();
     const slide = text ? SLIDES[text] : null;
 
     if (slide) {
+      currentlySeesQR = true;
+
+      // New QR code detected - switch to it immediately
       if (text !== activeId) {
+        speechFinished = false;  // Reset speech tracking
         activeId = text;
         renderSlide(slide);
       }
-      lastSeenAt = now;
       return;
     }
 
-    // Unrecognized code? Hide immediately.
+    // Unrecognized code? Only hide if not currently speaking
     if (text && !slide) {
-      activeId = null;
-      hideSlide();
+      currentlySeesQR = false;
+      if (speechFinished || !isSpeaking) {
+        activeId = null;
+        hideSlide();
+      }
       return;
     }
 
-    // No code in view: after timeout, hide.
-    if (activeId && now - lastSeenAt > LOST_TIMEOUT_MS) {
+    // No code in view - mark it, but don't hide until speech finishes
+    currentlySeesQR = false;
+
+    // If speech is done and QR is gone, hide the slide
+    if (speechFinished && activeId) {
       activeId = null;
-      lastSeenAt = 0;
       hideSlide();
     }
   }
