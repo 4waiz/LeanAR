@@ -171,42 +171,63 @@ document.addEventListener('DOMContentLoaded', () => {
       speechSynth.cancel();
     }
 
-    // Build the speech text
-    const textToSpeak = `${slide.title}. Definition: ${slide.def}. Description: ${slide.desc}`;
+    // Small delay to ensure cancel completes
+    setTimeout(() => {
+      // Build the speech text
+      const textToSpeak = `${slide.title}. Definition: ${slide.def}. Description: ${slide.desc}`;
 
-    currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
-    currentUtterance.rate = 0.85;  // Slightly slower for gravitas
-    currentUtterance.pitch = 0.7;  // Lower pitch for deep male voice
-    currentUtterance.volume = 1.0;
+      currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
+      currentUtterance.rate = 0.85;  // Slightly slower for gravitas
+      currentUtterance.pitch = 0.7;  // Lower pitch for deep male voice
+      currentUtterance.volume = 1.0;
 
-    // Try to get a deep male voice
-    const voices = speechSynth.getVoices();
-    // Prefer male voices, especially deeper ones
-    const preferredVoice =
-      voices.find((v) => v.name.includes('Google UK English Male')) ||
-      voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
-      voices.find((v) => v.name.includes('Daniel')) ||  // macOS deep male
-      voices.find((v) => v.name.includes('David')) ||   // Windows male
-      voices.find((v) => v.name.includes('James')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')) ||
-      voices.find((v) => v.lang.startsWith('en'));
-    if (preferredVoice) {
-      currentUtterance.voice = preferredVoice;
-    }
+      // Try to get a deep male voice
+      const voices = speechSynth.getVoices();
+      // Prefer male voices, especially deeper ones
+      const preferredVoice =
+        voices.find((v) => v.name.includes('Google UK English Male')) ||
+        voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
+        voices.find((v) => v.name.includes('Daniel')) ||  // macOS deep male
+        voices.find((v) => v.name.includes('David')) ||   // Windows male
+        voices.find((v) => v.name.includes('James')) ||
+        voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')) ||
+        voices.find((v) => v.lang.startsWith('en'));
+      if (preferredVoice) {
+        currentUtterance.voice = preferredVoice;
+      }
 
-    currentUtterance.onstart = () => {
-      isSpeaking = true;
-    };
+      currentUtterance.onstart = () => {
+        isSpeaking = true;
+      };
 
-    currentUtterance.onend = () => {
-      isSpeaking = false;
-    };
+      currentUtterance.onend = () => {
+        isSpeaking = false;
+      };
 
-    currentUtterance.onerror = () => {
-      isSpeaking = false;
-    };
+      currentUtterance.onerror = (e) => {
+        isSpeaking = false;
+        console.warn('Speech error:', e);
+      };
 
-    speechSynth.speak(currentUtterance);
+      // Chrome bug workaround: speech can get stuck, so we resume it
+      speechSynth.resume();
+      speechSynth.speak(currentUtterance);
+
+      // Chrome bug: long texts can pause, keep it alive
+      const keepAlive = setInterval(() => {
+        if (!speechSynth.speaking) {
+          clearInterval(keepAlive);
+        } else {
+          speechSynth.pause();
+          speechSynth.resume();
+        }
+      }, 10000);
+
+      currentUtterance.onend = () => {
+        isSpeaking = false;
+        clearInterval(keepAlive);
+      };
+    }, 100);
   }
 
   function stopSpeaking() {
@@ -216,14 +237,38 @@ document.addEventListener('DOMContentLoaded', () => {
     isSpeaking = false;
   }
 
+  // Unlock speech synthesis (required for mobile browsers)
+  function unlockSpeech() {
+    // Create a silent utterance to unlock audio
+    const unlock = new SpeechSynthesisUtterance('');
+    unlock.volume = 0;
+    speechSynth.speak(unlock);
+    speechSynth.cancel();
+
+    // Also try speaking a short word to fully prime it
+    const prime = new SpeechSynthesisUtterance('.');
+    prime.volume = 0.01;
+    prime.rate = 10;
+    speechSynth.speak(prime);
+  }
+
   // Initialize avatar
   initAvatar();
 
   // Ensure voices are loaded
+  let voicesLoaded = false;
+  function loadVoices() {
+    const voices = speechSynth.getVoices();
+    if (voices.length > 0) {
+      voicesLoaded = true;
+    }
+    return voices;
+  }
+
+  // Load voices immediately and on change
+  loadVoices();
   if (speechSynth.onvoiceschanged !== undefined) {
-    speechSynth.onvoiceschanged = () => {
-      speechSynth.getVoices();
-    };
+    speechSynth.onvoiceschanged = loadVoices;
   }
 
   /* ---------- UI tuning vars ---------- */
@@ -491,6 +536,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not supported in this browser.');
       }
+
+      // Unlock speech synthesis on user interaction (required for mobile)
+      unlockSpeech();
+
       loader.classList.remove('hidden');
       await startCamera();
       await setupDetector();
