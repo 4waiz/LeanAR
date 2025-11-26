@@ -178,22 +178,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const textToSpeak = `${slide.title}. Definition: ${slide.def}. Description: ${slide.desc}`;
 
       currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
-      currentUtterance.rate = 0.82;   // Slightly slower, more deliberate
-      currentUtterance.pitch = 0.85;  // Natural male pitch
+      currentUtterance.rate = 1.0;    // Normal speed
+      currentUtterance.pitch = 0.9;   // Slightly deep male voice
       currentUtterance.volume = 1.0;
 
-      // Try to get an Arabic-accented or Middle Eastern voice
+      // Get a natural male English voice
       const voices = speechSynth.getVoices();
       const preferredVoice =
-        // Arabic voices first
-        voices.find((v) => v.lang.startsWith('ar')) ||
-        // Indian/Pakistani voices often have similar intonation
-        voices.find((v) => v.lang.includes('IN') && v.name.toLowerCase().includes('male')) ||
-        voices.find((v) => v.name.includes('Rishi')) ||  // Indian male voice
-        // Fall back to UK male (more formal)
         voices.find((v) => v.name.includes('Google UK English Male')) ||
         voices.find((v) => v.name.includes('Daniel')) ||
+        voices.find((v) => v.name.includes('David')) ||
         voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
+        voices.find((v) => v.lang.startsWith('en-GB')) ||
         voices.find((v) => v.lang.startsWith('en'));
       if (preferredVoice) {
         currentUtterance.voice = preferredVoice;
@@ -263,21 +259,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Greeting when scanner starts
   function speakGreeting() {
     const greeting = new SpeechSynthesisUtterance(
-      "Ahlan wa sahlan! Welcome to Scan A R. Let us find the 8 types of waste together!"
+      "Hello! Welcome to Scan AR. Let's find the 8 types of waste together!"
     );
-    greeting.rate = 0.82;   // Slightly slower, more deliberate
-    greeting.pitch = 0.85;  // Natural male pitch
+    greeting.rate = 1.0;    // Normal speed
+    greeting.pitch = 0.9;   // Slightly deep male voice
     greeting.volume = 1.0;
 
-    // Get Arabic or Middle Eastern voice
+    // Get a natural male English voice
     const voices = speechSynth.getVoices();
     const preferredVoice =
-      voices.find((v) => v.lang.startsWith('ar')) ||
-      voices.find((v) => v.lang.includes('IN') && v.name.toLowerCase().includes('male')) ||
-      voices.find((v) => v.name.includes('Rishi')) ||
       voices.find((v) => v.name.includes('Google UK English Male')) ||
       voices.find((v) => v.name.includes('Daniel')) ||
+      voices.find((v) => v.name.includes('David')) ||
       voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
+      voices.find((v) => v.lang.startsWith('en-GB')) ||
       voices.find((v) => v.lang.startsWith('en'));
     if (preferredVoice) {
       greeting.voice = preferredVoice;
@@ -590,14 +585,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // Unlock speech synthesis on user interaction (required for mobile)
       unlockSpeech();
 
-      // Avatar greets the user
-      setTimeout(() => {
-        speakGreeting();
-      }, 200);
-
       loader.classList.remove('hidden');
       await startCamera();
       await setupDetector();
+
+      // Avatar greets after 5 seconds (after camera is ready)
+      setTimeout(() => {
+        speakGreeting();
+      }, 5000);
 
       scanning = true;
       startBtn.style.display = 'none';
