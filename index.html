@@ -6,6 +6,14 @@
         content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"/>
   <title>EDGE | 3D QR Scanner</title>
   <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="video-container">
@@ -26,6 +34,11 @@
 
     <!-- Error banner -->
     <div id="scan-result" class="hidden"><p></p></div>
+
+    <!-- Avatar container (bottom-right) -->
+    <div id="avatar-container">
+      <div id="avatar-loading">Loading Avatar...</div>
+    </div>
   </div>
 
   <footer class="footer">
@@ -33,6 +46,6 @@
     <a href="https://www.awaizahmed.com/" target="_blank" rel="noopener">Awaiz Ahmed</a>
   </footer>
 
-  <script src="./script.js"></script>
+  <script type="module" src="./script.js"></script>
 </body>
 </html>
