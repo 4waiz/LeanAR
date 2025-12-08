@@ -29,6 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let speechSynth = window.speechSynthesis;
   let currentUtterance = null;
 
+  // Lip sync variables
+  let mouthTarget = 0;           // Target mouth openness (0-1)
+  let currentMouthValue = 0;     // Current interpolated mouth value
+  let lastWordTime = 0;          // When the last word boundary was detected
+  let wordDuration = 150;        // Approximate duration to keep mouth open per word
+
+  // Q&A Feature variables
+  const OPENAI_API_KEY = "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";
+  let isListening = false;
+  let recognition = null;
+  let currentSlideContext = null;  // Store current slide info for Q&A context
+
   function initAvatar() {
     avatarScene = new THREE.Scene();
     avatarScene.background = null; // Transparent background
@@ -140,25 +152,41 @@ document.addEventListener('DOMContentLoaded', () => {
       part.mesh.morphTargetInfluences[part.index] = blinkValue;
     });
 
-    // Mouth movement when speaking
+    // Mouth movement - only when speaking, synced to speech
     if (isSpeaking) {
-      // Head bobbing while speaking
-      avatarModel.rotation.y = Math.sin(time * 1.5) * 0.08;
-      avatarModel.rotation.x = Math.sin(time * 2) * 0.02;
+      // Subtle head movement while speaking (more natural)
+      avatarModel.rotation.y = Math.sin(time * 0.8) * 0.04;
+      avatarModel.rotation.x = Math.sin(time * 1.2) * 0.015;
 
-      // Mouth animation synced to speech rhythm
-      const mouthValue = ((Math.sin(now * 0.025) + 1) / 2) * 0.5;
+      // Check if we're within the word duration window
+      const timeSinceWord = now - lastWordTime;
+      if (timeSinceWord < wordDuration) {
+        // Mouth should be open - vary the openness for natural look
+        const progress = timeSinceWord / wordDuration;
+        // Open quickly, close gradually (like real speech)
+        mouthTarget = progress < 0.3 ? 0.6 + Math.random() * 0.3 : (1 - progress) * 0.7;
+      } else {
+        // Between words - mouth closing
+        mouthTarget = 0;
+      }
+
+      // Smooth interpolation to target (fast open, slower close)
+      const lerpSpeed = mouthTarget > currentMouthValue ? 0.4 : 0.2;
+      currentMouthValue = THREE.MathUtils.lerp(currentMouthValue, mouthTarget, lerpSpeed);
+
       mouthParts.forEach((part) => {
-        part.mesh.morphTargetInfluences[part.index] = mouthValue;
+        part.mesh.morphTargetInfluences[part.index] = currentMouthValue;
       });
     } else {
-      // Smooth reset when not speaking
-      avatarModel.rotation.y = THREE.MathUtils.lerp(avatarModel.rotation.y, 0, 0.1);
-      avatarModel.rotation.x = THREE.MathUtils.lerp(avatarModel.rotation.x, 0, 0.1);
+      // Not speaking - smoothly close mouth and reset head
+      avatarModel.rotation.y = THREE.MathUtils.lerp(avatarModel.rotation.y, 0, 0.05);
+      avatarModel.rotation.x = THREE.MathUtils.lerp(avatarModel.rotation.x, 0, 0.05);
+
+      mouthTarget = 0;
+      currentMouthValue = THREE.MathUtils.lerp(currentMouthValue, 0, 0.15);
 
       mouthParts.forEach((part) => {
-        const current = part.mesh.morphTargetInfluences[part.index];
-        part.mesh.morphTargetInfluences[part.index] = THREE.MathUtils.lerp(current, 0, 0.1);
+        part.mesh.morphTargetInfluences[part.index] = currentMouthValue;
       });
     }
 
@@ -174,20 +202,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Small delay to ensure cancel completes
     setTimeout(() => {
-      // Build the speech text
-      const textToSpeak = `${slide.title}. Definition: ${slide.def}. Description: ${slide.desc}`;
+      // Build the speech text with natural pauses
+      const textToSpeak = `${slide.title}... Definition: ${slide.def}... Description: ${slide.desc}`;
 
       currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
-      currentUtterance.rate = 0.9;    // Slightly slower for natural speech
-      currentUtterance.pitch = 1.0;   // Natural pitch
+      currentUtterance.rate = 0.85;   // Slower for more natural, clear speech
+      currentUtterance.pitch = 1.05;  // Slightly higher for clarity
       currentUtterance.volume = 1.0;
 
-      // Get a natural male English voice
+      // Get a natural English voice (prefer high-quality voices)
       const voices = speechSynth.getVoices();
       const preferredVoice =
         voices.find((v) => v.name.includes('Google UK English Male')) ||
+        voices.find((v) => v.name.includes('Microsoft David')) ||
         voices.find((v) => v.name.includes('Daniel')) ||
-        voices.find((v) => v.name.includes('David')) ||
+        voices.find((v) => v.name.includes('James')) ||
         voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
         voices.find((v) => v.lang.startsWith('en-GB')) ||
         voices.find((v) => v.lang.startsWith('en'));
@@ -197,6 +226,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       currentUtterance.onstart = () => {
         isSpeaking = true;
+        lastWordTime = Date.now(); // Start mouth moving
+      };
+
+      // Lip sync: trigger mouth movement on word boundaries
+      currentUtterance.onboundary = (event) => {
+        if (event.name === 'word') {
+          lastWordTime = Date.now();
+          // Vary word duration based on the word length for more realism
+          const charIndex = event.charIndex || 0;
+          const wordLength = textToSpeak.slice(charIndex).split(/\s/)[0]?.length || 4;
+          wordDuration = Math.min(80 + wordLength * 25, 250); // 80-250ms based on word length
+        }
       };
 
       currentUtterance.onend = () => {
@@ -258,19 +299,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Greeting when scanner starts
   function speakGreeting() {
-    const greeting = new SpeechSynthesisUtterance(
-      "Hello! Welcome to Scan AR. Let's find the 8 types of waste together! Please go to Station 1, Inventory, so we can begin. Scan the QR code."
-    );
-    greeting.rate = 0.9;    // Slightly slower for natural speech
-    greeting.pitch = 1.0;   // Natural pitch
+    const greetingText = "Hello!... Welcome to Scan AR... Let's find the 8 types of waste together!... Please go to Station 1, Inventory, so we can begin... Scan the QR code.";
+    const greeting = new SpeechSynthesisUtterance(greetingText);
+    greeting.rate = 0.85;   // Slower for more natural, clear speech
+    greeting.pitch = 1.05;  // Slightly higher for clarity
     greeting.volume = 1.0;
 
-    // Get a natural male English voice
+    // Get a natural English voice (prefer high-quality voices)
     const voices = speechSynth.getVoices();
     const preferredVoice =
       voices.find((v) => v.name.includes('Google UK English Male')) ||
+      voices.find((v) => v.name.includes('Microsoft David')) ||
       voices.find((v) => v.name.includes('Daniel')) ||
-      voices.find((v) => v.name.includes('David')) ||
+      voices.find((v) => v.name.includes('James')) ||
       voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
       voices.find((v) => v.lang.startsWith('en-GB')) ||
       voices.find((v) => v.lang.startsWith('en'));
@@ -280,6 +321,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     greeting.onstart = () => {
       isSpeaking = true;
+      lastWordTime = Date.now(); // Start mouth moving
+    };
+
+    // Lip sync: trigger mouth movement on word boundaries
+    greeting.onboundary = (event) => {
+      if (event.name === 'word') {
+        lastWordTime = Date.now();
+        // Vary word duration based on the word length for more realism
+        const charIndex = event.charIndex || 0;
+        const wordLength = greetingText.slice(charIndex).split(/\s/)[0]?.length || 4;
+        wordDuration = Math.min(80 + wordLength * 25, 250); // 80-250ms based on word length
+      }
     };
 
     greeting.onend = () => {
@@ -288,6 +341,203 @@ document.addEventListener('DOMContentLoaded', () => {
 
     speechSynth.resume();
     speechSynth.speak(greeting);
+  }
+
+  // Generic speak function for Q&A responses (with lip sync)
+  function speakText(text, onComplete = null) {
+    if (speechSynth.speaking) {
+      speechSynth.cancel();
+    }
+
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.85;
+      utterance.pitch = 1.05;
+      utterance.volume = 1.0;
+
+      const voices = speechSynth.getVoices();
+      const preferredVoice =
+        voices.find((v) => v.name.includes('Google UK English Male')) ||
+        voices.find((v) => v.name.includes('Microsoft David')) ||
+        voices.find((v) => v.name.includes('Daniel')) ||
+        voices.find((v) => v.name.includes('James')) ||
+        voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
+        voices.find((v) => v.lang.startsWith('en-GB')) ||
+        voices.find((v) => v.lang.startsWith('en'));
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      utterance.onstart = () => {
+        isSpeaking = true;
+        lastWordTime = Date.now();
+      };
+
+      utterance.onboundary = (event) => {
+        if (event.name === 'word') {
+          lastWordTime = Date.now();
+          const charIndex = event.charIndex || 0;
+          const wordLength = text.slice(charIndex).split(/\s/)[0]?.length || 4;
+          wordDuration = Math.min(80 + wordLength * 25, 250);
+        }
+      };
+
+      utterance.onend = () => {
+        isSpeaking = false;
+        if (onComplete) onComplete();
+      };
+
+      utterance.onerror = () => {
+        isSpeaking = false;
+        if (onComplete) onComplete();
+      };
+
+      speechSynth.resume();
+      speechSynth.speak(utterance);
+    }, 100);
+  }
+
+  // Initialize speech recognition
+  function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported');
+      return null;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    return recognition;
+  }
+
+  // Call OpenAI API to get answer
+  async function getAIResponse(question, slideContext) {
+    const systemPrompt = `You are a helpful assistant explaining Lean Manufacturing concepts.
+You are currently explaining "${slideContext.title}" which is one of the 8 types of waste in Lean Manufacturing.
+Definition: ${slideContext.def}
+Description: ${slideContext.desc}
+
+Answer questions concisely and clearly in 2-3 sentences. Keep responses under 50 words. Be friendly and educational.`;
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: question }
+          ],
+          max_tokens: 150,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('OpenAI API error:', error);
+      return "I'm sorry, I couldn't process your question right now. Please try again.";
+    }
+  }
+
+  // Start Q&A flow
+  function startQAFlow() {
+    if (!currentSlideContext) return;
+
+    const askBtn = document.getElementById('ask-question-btn');
+    if (askBtn) {
+      askBtn.textContent = 'Listening...';
+      askBtn.disabled = true;
+    }
+
+    // Avatar asks what question the user has
+    const prompt = `What questions do you have regarding ${currentSlideContext.title}?`;
+    speakText(prompt, () => {
+      // After speaking, start listening
+      startListening();
+    });
+  }
+
+  // Start listening for user's question
+  function startListening() {
+    if (!recognition) {
+      recognition = initSpeechRecognition();
+    }
+
+    if (!recognition) {
+      speakText("Sorry, speech recognition is not supported in your browser. Please try a different browser.");
+      resetAskButton();
+      return;
+    }
+
+    isListening = true;
+
+    recognition.onresult = async (event) => {
+      const question = event.results[0][0].transcript;
+      console.log('User asked:', question);
+      isListening = false;
+
+      const askBtn = document.getElementById('ask-question-btn');
+      if (askBtn) {
+        askBtn.textContent = 'Thinking...';
+      }
+
+      // Get AI response
+      const answer = await getAIResponse(question, currentSlideContext);
+
+      // Speak the answer
+      speakText(answer, () => {
+        resetAskButton();
+      });
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      isListening = false;
+
+      if (event.error === 'no-speech') {
+        speakText("I didn't hear anything. Please tap the button and try again.", () => {
+          resetAskButton();
+        });
+      } else {
+        resetAskButton();
+      }
+    };
+
+    recognition.onend = () => {
+      if (isListening) {
+        isListening = false;
+        resetAskButton();
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Recognition start error:', e);
+      resetAskButton();
+    }
+  }
+
+  // Reset the ask button to original state
+  function resetAskButton() {
+    const askBtn = document.getElementById('ask-question-btn');
+    if (askBtn) {
+      askBtn.textContent = 'Ask me any question';
+      askBtn.disabled = false;
+    }
   }
 
   // Initialize avatar
@@ -424,12 +674,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Build + mount a slide card
   function renderSlide(slide) {
+    // Store current slide context for Q&A
+    currentSlideContext = slide;
+
     infoOverlay.innerHTML = `
       <div class="info-content">
         <div class="info-text">
           <h1 id="slide-title" class="outlined h1">${slide.title}</h1>
           <p class="outlined small"><span class="label">DEFINITION:</span> ${slide.def}</p>
           <p class="outlined small"><span class="label">DESCRIPTION:</span> ${slide.desc}</p>
+          <button id="ask-question-btn" class="ask-btn">Ask me any question</button>
         </div>
         <div class="info-image">
           <img id="slide-image" src="${slide.img}" alt="${slide.alt || slide.title}" />
@@ -437,6 +691,15 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>`;
     infoOverlay.classList.remove('hidden');
     infoOverlay.setAttribute('aria-hidden', 'false');
+
+    // Add click handler for the Q&A button
+    const askBtn = document.getElementById('ask-question-btn');
+    if (askBtn) {
+      askBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startQAFlow();
+      });
+    }
 
     // Avatar speaks the slide content
     speakSlideContent(slide);
