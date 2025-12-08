@@ -36,10 +36,98 @@ document.addEventListener('DOMContentLoaded', () => {
   let wordDuration = 150;        // Approximate duration to keep mouth open per word
 
   // Q&A Feature variables
-  const OPENAI_API_KEY = "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";
   let isListening = false;
   let recognition = null;
   let currentSlideContext = null;  // Store current slide info for Q&A context
+
+  // Pre-defined Q&A answers for each waste type
+  const QA_ANSWERS = {
+    'INVENTORY': {
+      what: "Inventory waste is when you have more materials or products than needed. This ties up money and space that could be used elsewhere.",
+      why: "Inventory waste happens because of overproduction, poor demand forecasting, or fear of running out of stock. It creates hidden costs.",
+      how: "You can reduce inventory waste by implementing just-in-time delivery, improving demand forecasting, and reducing batch sizes.",
+      example: "An example of inventory waste is a warehouse full of parts that sit for months before being used, or products that expire before being sold.",
+      problem: "Inventory waste causes storage costs, risk of damage or obsolescence, tied-up capital, and can hide other production problems.",
+      default: "Inventory waste occurs when we hold more stock than necessary. It increases costs and can lead to obsolescence."
+    },
+    'TRANSPORTATION': {
+      what: "Transportation waste is unnecessary movement of materials or products between locations that adds no value to the final product.",
+      why: "Transportation waste happens due to poor facility layout, distant suppliers, or inefficient routing. Every move costs time and money.",
+      how: "Reduce transportation waste by optimizing facility layout, sourcing locally, and organizing workstations to minimize material movement.",
+      example: "An example is moving parts across the factory multiple times, or shipping products to a warehouse before sending to customers.",
+      problem: "Transportation waste increases lead time, fuel costs, risk of damage, and delays delivery to customers.",
+      default: "Transportation waste is the unnecessary movement of materials. It adds cost without adding value to the product."
+    },
+    'WAITING TIME': {
+      what: "Waiting time waste is when people, machines, or materials are idle because the next step isn't ready.",
+      why: "Waiting happens due to unbalanced workloads, equipment breakdowns, missing materials, or poor scheduling.",
+      how: "Reduce waiting by balancing workloads, preventive maintenance, keeping materials ready, and improving communication between teams.",
+      example: "Examples include workers waiting for parts to arrive, machines sitting idle between batches, or approvals that take too long.",
+      problem: "Waiting waste reduces productivity, increases lead time, and means you're paying for time that produces nothing.",
+      default: "Waiting time waste is idle time when nothing productive is happening. It slows down the entire process."
+    },
+    'OVERPRODUCTION': {
+      what: "Overproduction is making more products than customers need, or making them too early before they're needed.",
+      why: "Overproduction happens from producing to forecast instead of actual orders, or trying to keep machines always running.",
+      how: "Reduce overproduction by using pull systems, producing to actual demand, and reducing batch sizes.",
+      example: "An example is a factory making 1000 units when only 500 are ordered, creating excess inventory that may never sell.",
+      problem: "Overproduction is considered the worst waste because it causes all other wastes: inventory, transportation, waiting, and more.",
+      default: "Overproduction means making more than needed. It's the most serious waste because it triggers other wastes."
+    },
+    'MOVEMENT': {
+      what: "Movement waste is unnecessary motion by workers, like walking, reaching, or bending that doesn't add value.",
+      why: "Movement waste comes from poor workplace layout, tools stored far away, or disorganized work areas.",
+      how: "Reduce movement by organizing tools within arm's reach, improving workstation layout, and applying 5S methodology.",
+      example: "Examples include walking across the shop to get tools, bending to pick up parts from the floor, or searching for equipment.",
+      problem: "Movement waste causes fatigue, injuries, slower work, and takes time away from value-adding activities.",
+      default: "Movement waste is unnecessary physical motion by workers. It reduces efficiency and can cause injuries."
+    },
+    'OVERPROCESSING': {
+      what: "Overprocessing is doing more work than the customer requires or is willing to pay for.",
+      why: "Overprocessing happens when we don't understand customer needs, use wrong tools, or have unclear standards.",
+      how: "Reduce overprocessing by understanding what customers truly value, using right-sized equipment, and simplifying processes.",
+      example: "Examples include polishing surfaces that won't be seen, adding features nobody uses, or using expensive materials when cheaper ones work.",
+      problem: "Overprocessing wastes time, materials, and effort on things that don't increase product value for customers.",
+      default: "Overprocessing means doing more work than necessary. It wastes resources on things customers don't need."
+    },
+    'DEFECTS': {
+      what: "Defects are products or work that don't meet quality standards and need to be fixed, reworked, or scrapped.",
+      why: "Defects happen from poor training, unclear instructions, inadequate tools, or lack of quality checks.",
+      how: "Reduce defects by training workers, standardizing processes, adding quality checks, and fixing root causes.",
+      example: "Examples include products that fail inspection, typos in documents, software bugs, or parts that don't fit properly.",
+      problem: "Defects waste materials, require extra labor to fix, delay delivery, and can damage customer relationships.",
+      default: "Defects are mistakes that require rework or scrapping. They waste time, materials, and hurt customer satisfaction."
+    },
+    'SKILLS NOT USED': {
+      what: "Skills not used means failing to utilize the talents, knowledge, and creativity of your employees.",
+      why: "This waste happens when management doesn't listen to workers, or people are assigned to jobs that don't match their skills.",
+      how: "Use employee skills by encouraging suggestions, involving workers in problem-solving, and matching people to appropriate roles.",
+      example: "Examples include ignoring improvement ideas from workers, not training people, or having engineers do simple data entry.",
+      problem: "Not using skills leads to disengaged workers, missed improvement opportunities, and higher turnover.",
+      default: "Skills not used means wasting human potential. When we don't tap into employee knowledge, everyone loses."
+    }
+  };
+
+  // Get answer based on question keywords
+  function getGenericAnswer(question, slideContext) {
+    const q = question.toLowerCase();
+    const answers = QA_ANSWERS[slideContext.title] || QA_ANSWERS['INVENTORY'];
+
+    // Check for keywords in question
+    if (q.includes('what') || q.includes('define') || q.includes('mean')) {
+      return answers.what;
+    } else if (q.includes('why') || q.includes('cause') || q.includes('reason')) {
+      return answers.why;
+    } else if (q.includes('how') || q.includes('reduce') || q.includes('fix') || q.includes('solve') || q.includes('prevent')) {
+      return answers.how;
+    } else if (q.includes('example') || q.includes('instance') || q.includes('like what')) {
+      return answers.example;
+    } else if (q.includes('problem') || q.includes('issue') || q.includes('bad') || q.includes('effect') || q.includes('impact')) {
+      return answers.problem;
+    } else {
+      return answers.default;
+    }
+  }
 
   function initAvatar() {
     avatarScene = new THREE.Scene();
@@ -413,45 +501,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return recognition;
   }
 
-  // Call OpenAI API to get answer
-  async function getAIResponse(question, slideContext) {
-    const systemPrompt = `You are a helpful assistant explaining Lean Manufacturing concepts.
-You are currently explaining "${slideContext.title}" which is one of the 8 types of waste in Lean Manufacturing.
-Definition: ${slideContext.def}
-Description: ${slideContext.desc}
-
-Answer questions concisely and clearly in 2-3 sentences. Keep responses under 50 words. Be friendly and educational.`;
-
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: question }
-          ],
-          max_tokens: 150,
-          temperature: 0.7
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
-      return data.choices[0].message.content;
-    } catch (error) {
-      console.error('OpenAI API error:', error);
-      return "I'm sorry, I couldn't process your question right now. Please try again.";
-    }
-  }
-
   // Start Q&A flow
   function startQAFlow() {
     if (!currentSlideContext) return;
@@ -484,20 +533,15 @@ Answer questions concisely and clearly in 2-3 sentences. Keep responses under 50
 
     isListening = true;
 
-    recognition.onresult = async (event) => {
+    recognition.onresult = (event) => {
       const question = event.results[0][0].transcript;
       console.log('User asked:', question);
       isListening = false;
 
-      const askBtn = document.getElementById('ask-question-btn');
-      if (askBtn) {
-        askBtn.textContent = 'Thinking...';
-      }
+      // Get instant answer based on keywords
+      const answer = getGenericAnswer(question, currentSlideContext);
 
-      // Get AI response
-      const answer = await getAIResponse(question, currentSlideContext);
-
-      // Speak the answer
+      // Speak the answer immediately
       speakText(answer, () => {
         resetAskButton();
       });
