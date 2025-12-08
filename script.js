@@ -855,7 +855,7 @@ Answer questions concisely and clearly in 2-3 sentences. Keep responses under 50
       // Avatar greets after 5 seconds (after camera is ready)
       setTimeout(() => {
         speakGreeting();
-      }, 5000);
+      }, 1000);
 
       scanning = true;
       startBtn.style.display = 'none';
