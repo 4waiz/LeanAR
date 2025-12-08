@@ -178,8 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const textToSpeak = `${slide.title}. Definition: ${slide.def}. Description: ${slide.desc}`;
 
       currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
-      currentUtterance.rate = 1.0;    // Normal speed
-      currentUtterance.pitch = 0.9;   // Slightly deep male voice
+      currentUtterance.rate = 0.9;    // Slightly slower for natural speech
+      currentUtterance.pitch = 1.0;   // Natural pitch
       currentUtterance.volume = 1.0;
 
       // Get a natural male English voice
@@ -259,10 +259,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Greeting when scanner starts
   function speakGreeting() {
     const greeting = new SpeechSynthesisUtterance(
-      "Hello! Welcome to Scan AR. Let's find the 8 types of waste together!"
+      "Hello! Welcome to Scan AR. Let's find the 8 types of waste together! Please go to Station 1, Inventory, so we can begin. Scan the QR code."
     );
-    greeting.rate = 1.0;    // Normal speed
-    greeting.pitch = 0.9;   // Slightly deep male voice
+    greeting.rate = 0.9;    // Slightly slower for natural speech
+    greeting.pitch = 1.0;   // Natural pitch
     greeting.volume = 1.0;
 
     // Get a natural male English voice
