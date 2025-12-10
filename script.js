@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isListening = false;
   let recognition = null;
   let currentSlideContext = null;  // Store current slide info for Q&A context
+  let qaInProgress = false;        // Flag to prevent overlapping Q&A sessions
 
   // Pre-defined Q&A answers for each waste type
   const QA_ANSWERS = {
@@ -671,6 +672,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const question = input.value.trim();
       modal.remove();
       if (question && currentSlideContext) {
+        // Cancel any ongoing speech before answering
+        if (speechSynth.speaking) {
+          speechSynth.cancel();
+        }
         const answer = getGenericAnswer(question, currentSlideContext);
         speakText(answer, () => {
           resetAskButton();
@@ -687,6 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cancelBtn.addEventListener('click', () => {
       modal.remove();
+      qaInProgress = false;
       resetAskButton();
     });
 
@@ -694,9 +700,34 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         modal.remove();
+        qaInProgress = false;
         resetAskButton();
       }
     });
+  }
+
+  // Cancel any ongoing Q&A operations
+  function cancelOngoingQA() {
+    // Stop any ongoing speech
+    if (speechSynth.speaking) {
+      speechSynth.cancel();
+    }
+    isSpeaking = false;
+    stopTextLipSync();
+
+    // Stop any ongoing recognition
+    if (recognition) {
+      try {
+        recognition.abort();
+      } catch (e) {}
+    }
+    isListening = false;
+
+    // Clear timeout
+    if (recognitionTimeout) {
+      clearTimeout(recognitionTimeout);
+      recognitionTimeout = null;
+    }
   }
 
   // Start Q&A flow
@@ -706,6 +737,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // If Q&A is already in progress, cancel it and start fresh
+    if (qaInProgress) {
+      console.log('Cancelling ongoing Q&A to start new one');
+      cancelOngoingQA();
+    }
+
+    qaInProgress = true;
     const askBtn = document.getElementById('ask-question-btn');
 
     // Check if iPad - use text input directly (speech recognition is unreliable on iPad Safari)
@@ -727,9 +765,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Avatar asks what question the user has
     const prompt = `What questions do you have regarding ${currentSlideContext.title}?`;
     speakText(prompt, () => {
+      // Check if we were cancelled during speech
+      if (!qaInProgress) return;
+
       // Small delay then start listening
       setTimeout(() => {
-        startListening();
+        if (qaInProgress) {
+          startListening();
+        }
       }, 300);
     });
   }
@@ -841,6 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) {}
     }
     isListening = false;
+    qaInProgress = false;  // Mark Q&A as complete
 
     const askBtn = document.getElementById('ask-question-btn');
     if (askBtn) {
