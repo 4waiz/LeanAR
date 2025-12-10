@@ -35,9 +35,25 @@
     <!-- Error banner -->
     <div id="scan-result" class="hidden"><p></p></div>
 
-    <!-- Avatar container (bottom-right) -->
+    <!-- Avatar container (bottom-left) -->
     <div id="avatar-container">
       <div id="avatar-loading">Loading Avatar...</div>
+    </div>
+
+    <!-- Story container (main content display) -->
+    <div id="story-container" class="hidden">
+      <div class="story-frame">
+        <div class="story-header" id="story-header">SCAN AR</div>
+        <div class="story-content">
+          <div id="story-text"></div>
+        </div>
+        <button id="ask-question-btn" class="ask-btn hidden">Ask me any question</button>
+      </div>
+    </div>
+
+    <!-- Slide image (separate from story container) -->
+    <div id="slide-image-container" class="hidden">
+      <img id="slide-image" src="" alt="" />
     </div>
   </div>
 
