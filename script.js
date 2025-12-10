@@ -543,6 +543,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   }
 
+  // Detect iPad specifically (speech recognition is unreliable on iPad Safari)
+  function isIPad() {
+    // Check for iPad in user agent
+    if (/iPad/.test(navigator.userAgent)) {
+      return true;
+    }
+    // Modern iPads report as Mac with touch support
+    if (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent)) {
+      // Check screen size to differentiate from MacBooks with touchbar
+      const isTabletSize = window.screen.width >= 768 && window.screen.width <= 1366;
+      return isTabletSize;
+    }
+    return false;
+  }
+
   // Initialize speech recognition - always create fresh instance
   function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -563,11 +578,125 @@ document.addEventListener('DOMContentLoaded', () => {
     // Create fresh instance
     recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true; // Enable interim results for better feedback
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
 
     return recognition;
+  }
+
+  // Show text input modal for typing question (fallback for iOS)
+  function showTextInputModal() {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('qa-text-modal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'qa-text-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    `;
+
+    modal.innerHTML = `
+      <div style="
+        background: linear-gradient(145deg, #fef9e7, #fcf3c9);
+        border-radius: 20px;
+        padding: 24px;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      ">
+        <h3 style="margin: 0 0 16px; color: #1b5e20; font-size: 1.2rem; text-align: center;">
+          Ask about ${currentSlideContext?.title || 'this topic'}
+        </h3>
+        <input type="text" id="qa-text-input" placeholder="Type your question here..."
+          style="
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            border: 2px solid #c9a227;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+          "
+        />
+        <div style="display: flex; gap: 12px;">
+          <button id="qa-cancel-btn" style="
+            flex: 1;
+            padding: 12px;
+            background: #ccc;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+          ">Cancel</button>
+          <button id="qa-submit-btn" style="
+            flex: 1;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+          ">Ask</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const input = document.getElementById('qa-text-input');
+    const submitBtn = document.getElementById('qa-submit-btn');
+    const cancelBtn = document.getElementById('qa-cancel-btn');
+
+    // Focus input
+    setTimeout(() => input.focus(), 100);
+
+    // Handle submit
+    const handleSubmit = () => {
+      const question = input.value.trim();
+      modal.remove();
+      if (question && currentSlideContext) {
+        const answer = getGenericAnswer(question, currentSlideContext);
+        speakText(answer, () => {
+          resetAskButton();
+        });
+      } else {
+        resetAskButton();
+      }
+    };
+
+    submitBtn.addEventListener('click', handleSubmit);
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleSubmit();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      modal.remove();
+      resetAskButton();
+    });
+
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+        resetAskButton();
+      }
+    });
   }
 
   // Start Q&A flow
@@ -578,6 +707,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const askBtn = document.getElementById('ask-question-btn');
+
+    // Check if iPad - use text input directly (speech recognition is unreliable on iPad Safari)
+    if (isIPad()) {
+      if (askBtn) {
+        askBtn.textContent = 'Type your question...';
+        askBtn.disabled = true;
+      }
+      showTextInputModal();
+      return;
+    }
+
+    // Non-iOS: use voice recognition
     if (askBtn) {
       askBtn.textContent = 'Listening...';
       askBtn.disabled = true;
