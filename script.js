@@ -390,7 +390,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Speech error:', e);
       };
 
-      // Chrome bug workaround: speech can get stuck, so we resume it
       speechSynth.resume();
       speechSynth.speak(currentUtterance);
 
