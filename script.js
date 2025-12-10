@@ -7,7 +7,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const video = document.getElementById('video');
-  const infoOverlay = document.getElementById('info-overlay');
 
   const loader = document.getElementById('loader');
   const startBtn = document.getElementById('start-btn');
@@ -32,8 +31,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // Lip sync variables
   let mouthTarget = 0;           // Target mouth openness (0-1)
   let currentMouthValue = 0;     // Current interpolated mouth value
-  let lastWordTime = 0;          // When the last word boundary was detected
-  let wordDuration = 150;        // Approximate duration to keep mouth open per word
+  let currentSpeechText = '';    // Text currently being spoken
+  let speechStartTime = 0;       // When speech started
+  let speechDuration = 0;        // Estimated total speech duration
+  let lipSyncActive = false;     // Whether text-based lip sync is active
+
+  // Phoneme to mouth openness mapping (0 = closed, 1 = fully open)
+  const PHONEME_MAP = {
+    // Vowels - mouth open
+    'a': 0.9, 'e': 0.7, 'i': 0.5, 'o': 0.85, 'u': 0.6,
+    'A': 0.9, 'E': 0.7, 'I': 0.5, 'O': 0.85, 'U': 0.6,
+    // Semi-open consonants
+    'w': 0.5, 'y': 0.4, 'r': 0.4, 'l': 0.35,
+    'W': 0.5, 'Y': 0.4, 'R': 0.4, 'L': 0.35,
+    // Soft consonants
+    'h': 0.3, 'm': 0.1, 'n': 0.2, 'f': 0.25, 'v': 0.25,
+    'H': 0.3, 'M': 0.1, 'N': 0.2, 'F': 0.25, 'V': 0.25,
+    's': 0.2, 'z': 0.2, 'j': 0.3, 'c': 0.2,
+    'S': 0.2, 'Z': 0.2, 'J': 0.3, 'C': 0.2,
+    // Hard consonants - brief open
+    'b': 0.15, 'p': 0.15, 'd': 0.2, 't': 0.15, 'g': 0.25, 'k': 0.2,
+    'B': 0.15, 'P': 0.15, 'D': 0.2, 'T': 0.15, 'G': 0.25, 'K': 0.2,
+    // Other
+    'x': 0.2, 'q': 0.3, 'X': 0.2, 'Q': 0.3,
+    // Space/punctuation - mouth closes
+    ' ': 0, '.': 0, ',': 0, '!': 0, '?': 0, ':': 0, ';': 0,
+    '-': 0, '\n': 0
+  };
 
   // Q&A Feature variables
   let isListening = false;
@@ -240,28 +264,45 @@ document.addEventListener('DOMContentLoaded', () => {
       part.mesh.morphTargetInfluences[part.index] = blinkValue;
     });
 
-    // Mouth movement - only when speaking, synced to speech
-    if (isSpeaking) {
+    // Mouth movement - text-based lip sync
+    if (isSpeaking && lipSyncActive && currentSpeechText) {
       // Subtle head movement while speaking (more natural)
       avatarModel.rotation.y = Math.sin(time * 0.8) * 0.04;
       avatarModel.rotation.x = Math.sin(time * 1.2) * 0.015;
 
-      // Check if we're within the word duration window
-      const timeSinceWord = now - lastWordTime;
-      if (timeSinceWord < wordDuration) {
-        // Mouth should be open - vary the openness for natural look
-        const progress = timeSinceWord / wordDuration;
-        // Open quickly, close gradually (like real speech)
-        mouthTarget = progress < 0.3 ? 0.6 + Math.random() * 0.3 : (1 - progress) * 0.7;
-      } else {
-        // Between words - mouth closing
-        mouthTarget = 0;
-      }
+      // Calculate current position in text based on elapsed time
+      const elapsed = now - speechStartTime;
+      const progress = Math.min(elapsed / speechDuration, 1);
+      const charIndex = Math.floor(progress * currentSpeechText.length);
 
-      // Smooth interpolation to target (fast open, slower close)
-      const lerpSpeed = mouthTarget > currentMouthValue ? 0.4 : 0.2;
+      // Get current character and its mouth shape
+      const currentChar = currentSpeechText[charIndex] || ' ';
+      const targetOpenness = PHONEME_MAP[currentChar] !== undefined ? PHONEME_MAP[currentChar] : 0.3;
+
+      // Look ahead for smoother transitions
+      const nextChar = currentSpeechText[charIndex + 1] || ' ';
+      const nextOpenness = PHONEME_MAP[nextChar] !== undefined ? PHONEME_MAP[nextChar] : 0;
+
+      // Blend current and next for smooth transition
+      const charProgress = (progress * currentSpeechText.length) % 1;
+      mouthTarget = targetOpenness * (1 - charProgress * 0.3) + nextOpenness * (charProgress * 0.3);
+
+      // Smooth interpolation - different speeds for opening vs closing
+      const lerpSpeed = mouthTarget > currentMouthValue ? 0.35 : 0.2;
       currentMouthValue = THREE.MathUtils.lerp(currentMouthValue, mouthTarget, lerpSpeed);
 
+      // Clamp to valid range
+      currentMouthValue = Math.max(0, Math.min(1, currentMouthValue));
+
+      mouthParts.forEach((part) => {
+        part.mesh.morphTargetInfluences[part.index] = currentMouthValue;
+      });
+    } else if (isSpeaking) {
+      // Fallback if lip sync not active - subtle movement
+      avatarModel.rotation.y = Math.sin(time * 0.8) * 0.04;
+      avatarModel.rotation.x = Math.sin(time * 1.2) * 0.015;
+      mouthTarget = 0.3 + Math.sin(time * 8) * 0.2;
+      currentMouthValue = THREE.MathUtils.lerp(currentMouthValue, mouthTarget, 0.3);
       mouthParts.forEach((part) => {
         part.mesh.morphTargetInfluences[part.index] = currentMouthValue;
       });
@@ -279,6 +320,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     avatarRenderer.render(avatarScene, avatarCamera);
+  }
+
+  // Start text-based lip sync
+  function startTextLipSync(text, rate = 0.85) {
+    currentSpeechText = text;
+    speechStartTime = Date.now();
+    // Estimate duration: ~80ms per character at rate 1.0, adjusted for speech rate
+    // Also account for pauses at punctuation
+    const pauseChars = (text.match(/[.,!?;:]/g) || []).length;
+    const baseTime = text.length * 75; // 75ms per char
+    const pauseTime = pauseChars * 300; // 300ms per punctuation pause
+    speechDuration = (baseTime + pauseTime) / rate;
+    lipSyncActive = true;
+  }
+
+  // Stop text-based lip sync
+  function stopTextLipSync() {
+    lipSyncActive = false;
+    currentSpeechText = '';
+    speechStartTime = 0;
+    speechDuration = 0;
   }
 
   // Speech synthesis function
@@ -314,26 +376,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
       currentUtterance.onstart = () => {
         isSpeaking = true;
-        lastWordTime = Date.now(); // Start mouth moving
-      };
-
-      // Lip sync: trigger mouth movement on word boundaries
-      currentUtterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          lastWordTime = Date.now();
-          // Vary word duration based on the word length for more realism
-          const charIndex = event.charIndex || 0;
-          const wordLength = textToSpeak.slice(charIndex).split(/\s/)[0]?.length || 4;
-          wordDuration = Math.min(80 + wordLength * 25, 250); // 80-250ms based on word length
-        }
+        startTextLipSync(textToSpeak, 0.85); // Start text-based lip sync
       };
 
       currentUtterance.onend = () => {
         isSpeaking = false;
+        stopTextLipSync();
       };
 
       currentUtterance.onerror = (e) => {
         isSpeaking = false;
+        stopTextLipSync();
         console.warn('Speech error:', e);
       };
 
@@ -354,6 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentUtterance.onend = () => {
         isSpeaking = false;
         speechFinished = true;  // Mark speech as complete
+        stopTextLipSync();
         clearInterval(keepAlive);
         // Check if we should hide the slide now
         checkHideSlide();
@@ -374,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
       speechSynth.cancel();
     }
     isSpeaking = false;
+    stopTextLipSync();
   }
 
   // Unlock speech synthesis (required for mobile browsers)
@@ -388,6 +443,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Greeting when scanner starts
   function speakGreeting() {
     const greetingText = "Hello!... Welcome to Scan AR... Let's find the 8 types of waste together!... Please go to Station 1, Inventory, so we can begin... Scan the QR code.";
+
+    // Display text in story container (clean version without pauses)
+    const displayText = `<p>Hello! Welcome to Scan AR.</p>
+      <p>Let's find the 8 types of waste together!</p>
+      <p>Please go to <strong>Station 1 "Inventory"</strong> so we can begin. Scan the QR code.</p>`;
+
+    showStoryContent('SCAN AR', displayText, false, null);
+
     const greeting = new SpeechSynthesisUtterance(greetingText);
     greeting.rate = 0.85;   // Slower for more natural, clear speech
     greeting.pitch = 1.05;  // Slightly higher for clarity
@@ -409,22 +472,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     greeting.onstart = () => {
       isSpeaking = true;
-      lastWordTime = Date.now(); // Start mouth moving
-    };
-
-    // Lip sync: trigger mouth movement on word boundaries
-    greeting.onboundary = (event) => {
-      if (event.name === 'word') {
-        lastWordTime = Date.now();
-        // Vary word duration based on the word length for more realism
-        const charIndex = event.charIndex || 0;
-        const wordLength = greetingText.slice(charIndex).split(/\s/)[0]?.length || 4;
-        wordDuration = Math.min(80 + wordLength * 25, 250); // 80-250ms based on word length
-      }
+      startTextLipSync(greetingText, 0.85);
     };
 
     greeting.onend = () => {
       isSpeaking = false;
+      stopTextLipSync();
+      // Hide story container after speech ends
+      hideStoryContent();
     };
 
     speechSynth.resume();
@@ -458,25 +513,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       utterance.onstart = () => {
         isSpeaking = true;
-        lastWordTime = Date.now();
-      };
-
-      utterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          lastWordTime = Date.now();
-          const charIndex = event.charIndex || 0;
-          const wordLength = text.slice(charIndex).split(/\s/)[0]?.length || 4;
-          wordDuration = Math.min(80 + wordLength * 25, 250);
-        }
+        startTextLipSync(text, 0.85);
       };
 
       utterance.onend = () => {
         isSpeaking = false;
+        stopTextLipSync();
         if (onComplete) onComplete();
       };
 
       utterance.onerror = () => {
         isSpeaking = false;
+        stopTextLipSync();
         if (onComplete) onComplete();
       };
 
@@ -716,30 +764,74 @@ document.addEventListener('DOMContentLoaded', () => {
     if (scanResultDiv) scanResultDiv.classList.toggle('hidden', !isError);
   }
 
+  // Show content in story container
+  function showStoryContent(header, content, showAskBtn = false, imageUrl = null) {
+    const storyContainer = document.getElementById('story-container');
+    const storyHeader = document.getElementById('story-header');
+    const storyText = document.getElementById('story-text');
+    const askBtn = document.getElementById('ask-question-btn');
+    const imageContainer = document.getElementById('slide-image-container');
+    const slideImage = document.getElementById('slide-image');
+
+    if (storyHeader) storyHeader.textContent = header;
+    if (storyText) storyText.innerHTML = content;
+    if (storyContainer) storyContainer.classList.remove('hidden');
+
+    // Show/hide ask button
+    if (askBtn) {
+      if (showAskBtn) {
+        askBtn.classList.remove('hidden');
+        askBtn.textContent = 'Ask me any question';
+        askBtn.disabled = false;
+      } else {
+        askBtn.classList.add('hidden');
+      }
+    }
+
+    // Show/hide image
+    if (imageContainer && slideImage) {
+      if (imageUrl) {
+        slideImage.src = imageUrl;
+        slideImage.alt = header;
+        imageContainer.classList.remove('hidden');
+      } else {
+        imageContainer.classList.add('hidden');
+      }
+    }
+  }
+
+  // Hide story container
+  function hideStoryContent() {
+    const storyContainer = document.getElementById('story-container');
+    const imageContainer = document.getElementById('slide-image-container');
+    const askBtn = document.getElementById('ask-question-btn');
+
+    if (storyContainer) storyContainer.classList.add('hidden');
+    if (imageContainer) imageContainer.classList.add('hidden');
+    if (askBtn) askBtn.classList.add('hidden');
+  }
+
   // Build + mount a slide card
   function renderSlide(slide) {
     // Store current slide context for Q&A
     currentSlideContext = slide;
 
-    infoOverlay.innerHTML = `
-      <div class="info-content">
-        <div class="info-text">
-          <h1 id="slide-title" class="outlined h1">${slide.title}</h1>
-          <p class="outlined small"><span class="label">DEFINITION:</span> ${slide.def}</p>
-          <p class="outlined small"><span class="label">DESCRIPTION:</span> ${slide.desc}</p>
-          <button id="ask-question-btn" class="ask-btn">Ask me any question</button>
-        </div>
-        <div class="info-image">
-          <img id="slide-image" src="${slide.img}" alt="${slide.alt || slide.title}" />
-        </div>
-      </div>`;
-    infoOverlay.classList.remove('hidden');
-    infoOverlay.setAttribute('aria-hidden', 'false');
+    // Build content HTML
+    const contentHTML = `
+      <p><span class="label">Definition:</span> ${slide.def}</p>
+      <p><span class="label">Description:</span> ${slide.desc}</p>
+    `;
 
-    // Add click handler for the Q&A button
+    // Show in story container
+    showStoryContent(slide.title, contentHTML, true, slide.img);
+
+    // Setup ask button click handler
     const askBtn = document.getElementById('ask-question-btn');
     if (askBtn) {
-      askBtn.addEventListener('click', (e) => {
+      // Remove old listeners by cloning
+      const newBtn = askBtn.cloneNode(true);
+      askBtn.parentNode.replaceChild(newBtn, askBtn);
+      newBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startQAFlow();
       });
@@ -750,10 +842,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideSlide() {
-    infoOverlay.classList.add('hidden');
-    infoOverlay.setAttribute('aria-hidden', 'true');
-    infoOverlay.innerHTML = '';
+    hideStoryContent();
     stopSpeaking();
+    currentSlideContext = null;
   }
 
   // Only show overlay when a valid ID-x is detected.
