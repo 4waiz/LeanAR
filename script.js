@@ -6,6 +6,18 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Clear all caches and storage on every page load
+  try {
+    sessionStorage.clear();
+    localStorage.clear();
+    // Clear speech synthesis queue
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  } catch (e) {
+    console.log('Cache clear:', e);
+  }
+
   const video = document.getElementById('video');
 
   const loader = document.getElementById('loader');
@@ -531,7 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   }
 
-  // Initialize speech recognition
+  // Initialize speech recognition - always create fresh instance
   function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -539,17 +551,31 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
 
+    // Stop any existing recognition
+    if (recognition) {
+      try {
+        recognition.abort();
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // Create fresh instance
     recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
 
     return recognition;
   }
 
   // Start Q&A flow
   function startQAFlow() {
-    if (!currentSlideContext) return;
+    if (!currentSlideContext) {
+      console.log('No slide context for Q&A');
+      return;
+    }
 
     const askBtn = document.getElementById('ask-question-btn');
     if (askBtn) {
@@ -560,26 +586,51 @@ document.addEventListener('DOMContentLoaded', () => {
     // Avatar asks what question the user has
     const prompt = `What questions do you have regarding ${currentSlideContext.title}?`;
     speakText(prompt, () => {
-      // After speaking, start listening
-      startListening();
+      // Small delay then start listening
+      setTimeout(() => {
+        startListening();
+      }, 300);
     });
   }
 
+  // Timeout for recognition
+  let recognitionTimeout = null;
+
   // Start listening for user's question
   function startListening() {
-    if (!recognition) {
-      recognition = initSpeechRecognition();
-    }
+    // Always create fresh recognition instance
+    recognition = initSpeechRecognition();
 
     if (!recognition) {
-      speakText("Sorry, speech recognition is not supported in your browser. Please try a different browser.");
-      resetAskButton();
+      speakText("Sorry, speech recognition is not supported in your browser. Please try a different browser.", () => {
+        resetAskButton();
+      });
       return;
     }
 
     isListening = true;
 
+    // Clear any existing timeout
+    if (recognitionTimeout) {
+      clearTimeout(recognitionTimeout);
+    }
+
+    // Set timeout - if no response in 10 seconds, reset
+    recognitionTimeout = setTimeout(() => {
+      if (isListening) {
+        console.log('Recognition timeout');
+        try {
+          recognition.abort();
+        } catch (e) {}
+        isListening = false;
+        speakText("I didn't hear a question. Please tap the button to try again.", () => {
+          resetAskButton();
+        });
+      }
+    }, 10000);
+
     recognition.onresult = (event) => {
+      clearTimeout(recognitionTimeout);
       const question = event.results[0][0].transcript;
       console.log('User asked:', question);
       isListening = false;
@@ -594,6 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     recognition.onerror = (event) => {
+      clearTimeout(recognitionTimeout);
       console.error('Speech recognition error:', event.error);
       isListening = false;
 
@@ -601,12 +653,19 @@ document.addEventListener('DOMContentLoaded', () => {
         speakText("I didn't hear anything. Please tap the button and try again.", () => {
           resetAskButton();
         });
+      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        speakText("Microphone access was denied. Please enable microphone permissions.", () => {
+          resetAskButton();
+        });
       } else {
-        resetAskButton();
+        speakText("Sorry, there was an error. Please try again.", () => {
+          resetAskButton();
+        });
       }
     };
 
     recognition.onend = () => {
+      clearTimeout(recognitionTimeout);
       if (isListening) {
         isListening = false;
         resetAskButton();
@@ -615,14 +674,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       recognition.start();
+      console.log('Recognition started');
     } catch (e) {
       console.error('Recognition start error:', e);
-      resetAskButton();
+      clearTimeout(recognitionTimeout);
+      isListening = false;
+      speakText("Could not start voice recognition. Please try again.", () => {
+        resetAskButton();
+      });
     }
   }
 
   // Reset the ask button to original state
   function resetAskButton() {
+    // Clear any pending timeouts
+    if (recognitionTimeout) {
+      clearTimeout(recognitionTimeout);
+      recognitionTimeout = null;
+    }
+
+    // Stop any ongoing recognition
+    if (recognition && isListening) {
+      try {
+        recognition.abort();
+      } catch (e) {}
+    }
+    isListening = false;
+
     const askBtn = document.getElementById('ask-question-btn');
     if (askBtn) {
       askBtn.textContent = 'Ask me any question';
