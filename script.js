@@ -393,7 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
       speechSynth.resume();
       speechSynth.speak(currentUtterance);
 
-      // Chrome bug: long texts can pause, keep it alive
       const keepAlive = setInterval(() => {
         if (!speechSynth.speaking) {
           clearInterval(keepAlive);
