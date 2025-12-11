@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ---------- Avatar Setup ---------- */
   const avatarContainer = document.getElementById('avatar-container');
   const avatarLoading = document.getElementById('avatar-loading');
-  const MODEL_PATH = './muhammad.glb';
+  const MODEL_PATH = './assets/models/muhammad.glb';
 
   let avatarScene, avatarCamera, avatarRenderer, avatarModel;
   let mouthParts = [], eyeParts = [];
@@ -357,6 +357,30 @@ document.addEventListener('DOMContentLoaded', () => {
     speechDuration = 0;
   }
 
+  // Helper function to get preferred voice
+  function getPreferredVoice() {
+    const voices = speechSynth.getVoices();
+    return (
+      voices.find((v) => v.name.includes('Google UK English Male')) ||
+      voices.find((v) => v.name.includes('Microsoft David')) ||
+      voices.find((v) => v.name.includes('Daniel')) ||
+      voices.find((v) => v.name.includes('James')) ||
+      voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
+      voices.find((v) => v.lang.startsWith('en-GB')) ||
+      voices.find((v) => v.lang.startsWith('en')) ||
+      null
+    );
+  }
+
+  // Helper function to configure utterance settings
+  function configureUtterance(utterance) {
+    utterance.rate = 0.85;
+    utterance.pitch = 1.05;
+    utterance.volume = 1.0;
+    const voice = getPreferredVoice();
+    if (voice) utterance.voice = voice;
+  }
+
   // Speech synthesis function
   function speakSlideContent(slide) {
     // Don't speak if muted
@@ -376,32 +400,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const textToSpeak = `${slide.title}... Definition: ${slide.def}... Description: ${slide.desc}`;
 
       currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
-      currentUtterance.rate = 0.85;   // Slower for more natural, clear speech
-      currentUtterance.pitch = 1.05;  // Slightly higher for clarity
-      currentUtterance.volume = 1.0;
-
-      // Get a natural English voice (prefer high-quality voices)
-      const voices = speechSynth.getVoices();
-      const preferredVoice =
-        voices.find((v) => v.name.includes('Google UK English Male')) ||
-        voices.find((v) => v.name.includes('Microsoft David')) ||
-        voices.find((v) => v.name.includes('Daniel')) ||
-        voices.find((v) => v.name.includes('James')) ||
-        voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
-        voices.find((v) => v.lang.startsWith('en-GB')) ||
-        voices.find((v) => v.lang.startsWith('en'));
-      if (preferredVoice) {
-        currentUtterance.voice = preferredVoice;
-      }
+      configureUtterance(currentUtterance);
 
       currentUtterance.onstart = () => {
         isSpeaking = true;
-        startTextLipSync(textToSpeak, 0.85); // Start text-based lip sync
-      };
-
-      currentUtterance.onend = () => {
-        isSpeaking = false;
-        stopTextLipSync();
+        startTextLipSync(textToSpeak, 0.85);
       };
 
       currentUtterance.onerror = (e) => {
@@ -410,9 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Speech error:', e);
       };
 
-      speechSynth.resume();
-      speechSynth.speak(currentUtterance);
-
+      // Keep speech synthesis alive (Chrome bug workaround)
       const keepAlive = setInterval(() => {
         if (!speechSynth.speaking) {
           clearInterval(keepAlive);
@@ -424,12 +425,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       currentUtterance.onend = () => {
         isSpeaking = false;
-        speechFinished = true;  // Mark speech as complete
+        speechFinished = true;
         stopTextLipSync();
         clearInterval(keepAlive);
-        // Check if we should hide the slide now
         checkHideSlide();
       };
+
+      speechSynth.resume();
+      speechSynth.speak(currentUtterance);
     }, 100);
   }
 
@@ -478,23 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const greeting = new SpeechSynthesisUtterance(greetingText);
-    greeting.rate = 0.85;   // Slower for more natural, clear speech
-    greeting.pitch = 1.05;  // Slightly higher for clarity
-    greeting.volume = 1.0;
-
-    // Get a natural English voice (prefer high-quality voices)
-    const voices = speechSynth.getVoices();
-    const preferredVoice =
-      voices.find((v) => v.name.includes('Google UK English Male')) ||
-      voices.find((v) => v.name.includes('Microsoft David')) ||
-      voices.find((v) => v.name.includes('Daniel')) ||
-      voices.find((v) => v.name.includes('James')) ||
-      voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
-      voices.find((v) => v.lang.startsWith('en-GB')) ||
-      voices.find((v) => v.lang.startsWith('en'));
-    if (preferredVoice) {
-      greeting.voice = preferredVoice;
-    }
+    configureUtterance(greeting);
 
     greeting.onstart = () => {
       isSpeaking = true;
@@ -526,22 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.85;
-      utterance.pitch = 1.05;
-      utterance.volume = 1.0;
-
-      const voices = speechSynth.getVoices();
-      const preferredVoice =
-        voices.find((v) => v.name.includes('Google UK English Male')) ||
-        voices.find((v) => v.name.includes('Microsoft David')) ||
-        voices.find((v) => v.name.includes('Daniel')) ||
-        voices.find((v) => v.name.includes('James')) ||
-        voices.find((v) => v.name.includes('Male') && v.lang.startsWith('en')) ||
-        voices.find((v) => v.lang.startsWith('en-GB')) ||
-        voices.find((v) => v.lang.startsWith('en'));
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
+      configureUtterance(utterance);
 
       utterance.onstart = () => {
         isSpeaking = true;
@@ -972,56 +944,56 @@ document.addEventListener('DOMContentLoaded', () => {
       title: 'INVENTORY',
       def: 'Holding more inventory than is needed for production or customer orders. Raw materials, work-in-progress, or finished products.',
       desc: 'It results in higher storage costs, risk of obsolescence, and cash flow problems. It is often a consequence of overproduction, poor forecasting, or inefficient scheduling.',
-      img: 'image1.png',
+      img: 'assets/images/image1.png',
       alt: 'Inventory',
     },
     'ID-2': {
       title: 'TRANSPORTATION',
       def: 'Unnecessary movement of materials, products, or information between processes or locations.',
       desc: 'It includes any extra movement of items that does not add value to the product. Moving parts over long distances increases the risk of damage and adds to lead time.',
-      img: 'image2.png',
+      img: 'assets/images/image2.png',
       alt: 'Transportation',
     },
     'ID-3': {
       title: 'WAITING TIME',
       def: 'Time when people, equipment, materials or information are not in use, also called idle time.',
       desc: 'It occurs when workers or machines are forced to stand idle due to delays. This waste slows down production cycles and creates bottlenecks in the workflow.',
-      img: 'image3.png',
+      img: 'assets/images/image3.png',
       alt: 'Waiting Time',
     },
     'ID-4': {
       title: 'OVERPRODUCTION',
       def: 'Producing more than what is immediately needed by the final customer, the next process or producing earlier than necessary.',
       desc: 'It leads to excess inventory and ties up resources in unsold goods. It often occurs when companies operate on forecasts instead of actual demand.',
-      img: 'image4.png',
+      img: 'assets/images/image4.png',
       alt: 'Overproduction',
     },
     'ID-5': {
       title: 'MOVEMENT',
       def: 'Excessive or inefficient movement of people, equipment, or machinery within the production process.',
       desc: 'It includes walking long distances, reaching, bending, or stretching to retrieve tools or parts. This reduces worker efficiency and can lead to fatigue or injuries.',
-      img: 'image5.png',
+      img: 'assets/images/image5.png',
       alt: 'Movement',
     },
     'ID-6': {
       title: 'OVERPROCESSING',
       def: 'Performing more work or adding more features than the customer requires.',
       desc: 'Overprocessing involves unnecessary activities that do not enhance the product value from the customer perspective. This results in wasted time, resources, and labor.',
-      img: 'image6.png',
+      img: 'assets/images/image6.png',
       alt: 'Overprocessing',
     },
     'ID-7': {
       title: 'DEFECTS',
       def: 'Products or materials that do not meet quality standards, requiring rework, repairs, or disposal.',
       desc: 'Defects are costly because they lead to wasted materials, labor, and time. Rework consumes resources that could have been used for new production.',
-      img: 'image7.png',
+      img: 'assets/images/image7.png',
       alt: 'Defects',
     },
     'ID-8': {
       title: 'SKILLS NOT USED',
       def: 'The failure to fully utilize the skills, knowledge, and creativity of employees, along with the failure to leverage available data.',
       desc: 'This occurs when companies do not take advantage of the full potential of their workforce. Employees may not be involved in decision-making or process optimization.',
-      img: 'image8.png',
+      img: 'assets/images/image8.png',
       alt: 'Skills Not Used',
     },
   };

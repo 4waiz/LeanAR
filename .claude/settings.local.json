@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(move image.png assetsimages )",
+      "Bash(move image1.png assetsimages )",
+      "Bash(move image2.png assetsimages )",
+      "Bash(move image3.png assetsimages )",
+      "Bash(move image4.png assetsimages)",
+      "Bash(move image5.png assetsimages )",
+      "Bash(move image6.png assetsimages )",
+      "Bash(move image7.png assetsimages )",
+      "Bash(move image8.png assetsimages)",
+      "Bash(move style.css css )",
+      "Bash(move script.js js)"
+    ]
+  }
+}
