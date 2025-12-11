@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let recognition = null;
   let currentSlideContext = null;  // Store current slide info for Q&A context
   let qaInProgress = false;        // Flag to prevent overlapping Q&A sessions
+  let isMuted = false;             // Track mute state
 
   // Pre-defined Q&A answers for each waste type
   const QA_ANSWERS = {
@@ -358,6 +359,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Speech synthesis function
   function speakSlideContent(slide) {
+    // Don't speak if muted
+    if (isMuted) {
+      speechFinished = true;
+      return;
+    }
+
     // Cancel any ongoing speech
     if (speechSynth.speaking) {
       speechSynth.cancel();
@@ -462,6 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showStoryContent('SCAN AR', displayText, false, null);
 
+    // Don't speak if muted, just hide after delay
+    if (isMuted) {
+      setTimeout(() => {
+        hideStoryContent();
+      }, 5000);
+      return;
+    }
+
     const greeting = new SpeechSynthesisUtterance(greetingText);
     greeting.rate = 0.85;   // Slower for more natural, clear speech
     greeting.pitch = 1.05;  // Slightly higher for clarity
@@ -499,6 +514,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Generic speak function for Q&A responses (with lip sync)
   function speakText(text, onComplete = null) {
+    // Don't speak if muted
+    if (isMuted) {
+      if (onComplete) onComplete();
+      return;
+    }
+
     if (speechSynth.speaking) {
       speechSynth.cancel();
     }
@@ -1274,4 +1295,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
   startBtn.addEventListener('click', startScanner);
   window.addEventListener('beforeunload', stopCamera);
+
+  // ---------- Mute Button Functionality ----------
+  const muteBtn = document.getElementById('mute-btn');
+  const muteIconOn = document.getElementById('mute-icon-on');
+  const muteIconOff = document.getElementById('mute-icon-off');
+
+  if (muteBtn) {
+    muteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isMuted = !isMuted;
+
+      if (isMuted) {
+        // Mute: stop current speech and prevent future speech
+        if (speechSynth.speaking) {
+          speechSynth.cancel();
+        }
+        isSpeaking = false;
+        stopTextLipSync();
+        muteBtn.classList.add('muted');
+        muteIconOn.classList.add('hidden');
+        muteIconOff.classList.remove('hidden');
+      } else {
+        // Unmute
+        muteBtn.classList.remove('muted');
+        muteIconOn.classList.remove('hidden');
+        muteIconOff.classList.add('hidden');
+      }
+    });
+  }
+
+  // ---------- Fullscreen Image Functionality ----------
+  const slideImage = document.getElementById('slide-image');
+  const fullscreenOverlay = document.getElementById('fullscreen-image-overlay');
+  const fullscreenImage = document.getElementById('fullscreen-image');
+  const closeFullscreenBtn = document.getElementById('close-fullscreen-btn');
+
+  // Function to open fullscreen
+  function openFullscreen() {
+    if (slideImage.src && fullscreenOverlay && fullscreenImage) {
+      fullscreenImage.src = slideImage.src;
+      fullscreenImage.alt = slideImage.alt;
+      fullscreenOverlay.classList.remove('hidden');
+      // Hide avatar during fullscreen
+      if (avatarContainer) avatarContainer.style.display = 'none';
+    }
+  }
+
+  // Function to close fullscreen
+  function closeFullscreen() {
+    if (fullscreenOverlay) {
+      fullscreenOverlay.classList.add('hidden');
+      // Show avatar again
+      if (avatarContainer) avatarContainer.style.display = '';
+    }
+  }
+
+  if (slideImage) {
+    slideImage.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFullscreen();
+    });
+  }
+
+  if (closeFullscreenBtn) {
+    closeFullscreenBtn.addEventListener('click', closeFullscreen);
+  }
+
+  if (fullscreenOverlay) {
+    // Close on background click
+    fullscreenOverlay.addEventListener('click', (e) => {
+      if (e.target === fullscreenOverlay) {
+        closeFullscreen();
+      }
+    });
+  }
 });
