@@ -1,5 +1,5 @@
 
-# 🔍📱 ScanAR
+# 🔍📱 LeanAR
 
 Turn any **QR code** into an **instant AR info panel** on your iPhone.  
 ScanAR uses your device’s camera to detect a specific QR code and overlays helpful text, links, and status details right on screen — no extra app installs needed.
