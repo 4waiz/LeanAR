@@ -284,28 +284,28 @@ html,body{
   display: inline-block;
   margin-top: 12px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #ff4521 0%, #d42f10 100%);
   color: #fff;
   border: none;
-  border-radius: 25px;
+  border-radius: 8px;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   pointer-events: auto;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(255, 69, 33, 0.4);
   transition: all 0.3s ease;
-  text-transform: none;
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .ask-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 20px rgba(255, 69, 33, 0.5);
 }
 
 .ask-btn:active {
   transform: translateY(0);
-  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 2px 10px rgba(255, 69, 33, 0.4);
 }
 
 .ask-btn:disabled {
@@ -357,70 +357,82 @@ html,body{
   }
 }
 
+/* ---------- EDGE Group brand theme ---------- */
+:root {
+  --edge-orange: #ff4521;
+  --edge-orange-dark: #d42f10;
+  --edge-charcoal: #1c1f24;
+  --edge-charcoal-2: #2a2e35;
+  --edge-ink: #1c1f24;
+}
+
 .story-frame {
   position: relative;
   width: min(42vw, 480px);
-  background: linear-gradient(145deg, #fef9e7 0%, #fdf6d8 50%, #fcf3c9 100%);
-  border-radius: 20px;
+  background: linear-gradient(160deg, #25292f 0%, #1c1f24 100%);
+  border-radius: 16px;
   padding: 6px;
   box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.4),
-    inset 0 2px 4px rgba(255, 255, 255, 0.9);
+    0 14px 44px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .story-frame::before {
   content: '';
   position: absolute;
   inset: 8px;
-  border: 3px solid #c9a227;
-  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
   pointer-events: none;
 }
 
-/* Decorative inner border */
+/* EDGE accent bar (the signature orange block) */
 .story-frame::after {
   content: '';
   position: absolute;
-  inset: 16px;
-  border: 2px dashed #d4af37;
-  border-radius: 10px;
+  top: 0;
+  left: 24px;
+  width: 64px;
+  height: 5px;
+  background: var(--edge-orange);
+  border-radius: 0 0 4px 4px;
   pointer-events: none;
-  opacity: 0.4;
 }
 
 .story-header {
   position: relative;
   z-index: 2;
-  background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #388e3c 100%);
+  background: linear-gradient(135deg, var(--edge-orange) 0%, var(--edge-orange-dark) 100%);
   color: #fff;
   text-align: center;
   padding: 14px 24px;
-  margin: 16px 20px 12px 20px;
-  border-radius: 30px;
+  margin: 18px 18px 14px 18px;
+  border-radius: 8px;
   font-size: 1.4rem;
   font-weight: 900;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   text-transform: uppercase;
   box-shadow:
-    0 6px 16px rgba(27, 94, 32, 0.5),
-    inset 0 2px 4px rgba(255, 255, 255, 0.25);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    0 6px 18px rgba(255, 69, 33, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .story-content {
   position: relative;
   z-index: 2;
-  padding: 20px 28px 24px 28px;
-  margin: 0 12px 12px 12px;
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 14px;
-  border: 2px solid rgba(201, 162, 39, 0.4);
+  padding: 20px 26px 24px 26px;
+  margin: 0 10px 12px 10px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-left: 4px solid var(--edge-orange);
   max-height: 50vh;
   overflow-y: auto;
 }
 
 #story-text {
-  color: #2c3e50;
+  color: var(--edge-ink);
   font-size: 1.1rem;
   font-weight: 600;
   line-height: 1.7;
@@ -435,8 +447,12 @@ html,body{
   margin-bottom: 0;
 }
 
+#story-text strong {
+  color: var(--edge-orange-dark);
+}
+
 #story-text .label {
-  color: #1b5e20;
+  color: var(--edge-orange-dark);
   font-weight: 800;
   text-transform: uppercase;
   font-size: 0.95rem;
