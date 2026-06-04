@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <p>Let's find the 8 types of waste together!</p>
       <p>Please go to <strong>Station 1 "Inventory"</strong> so we can begin. Scan the QR code.</p>`;
 
-    showStoryContent('LEANAR', displayText, false, null);
+    showStoryContent('LEAN AR', displayText, false, null);
 
     // Don't speak if muted, just hide after delay
     if (isMuted) {
