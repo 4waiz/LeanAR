@@ -463,14 +463,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Greeting when scanner starts
   function speakGreeting() {
-    const greetingText = "Hello!... Welcome to Scan AR... Let's find the 8 types of waste together!... Please go to Station 1, Inventory, so we can begin... Scan the QR code.";
+    const greetingText = "Hello!... Welcome to LeanAR... Let's find the 8 types of waste together!... Please go to Station 1, Inventory, so we can begin... Scan the QR code.";
 
     // Display text in story container (clean version without pauses)
-    const displayText = `<p>Hello! Welcome to Scan AR.</p>
+    const displayText = `<p>Hello! Welcome to LeanAR.</p>
       <p>Let's find the 8 types of waste together!</p>
       <p>Please go to <strong>Station 1 "Inventory"</strong> so we can begin. Scan the QR code.</p>`;
 
-    showStoryContent('SCAN AR', displayText, false, null);
+    showStoryContent('LEANAR', displayText, false, null);
 
     // Don't speak if muted, just hide after delay
     if (isMuted) {
