@@ -26,3 +26,36 @@ ScanAR uses your device’s camera to detect a specific QR code and overlays hel
    ```bash
    git clone https://github.com/ScanAR.git
    cd ScanAR
+   ```
+2. Install the dev tooling (Cloudflare Wrangler):
+   ```bash
+   npm install
+   ```
+3. Run it locally:
+   ```bash
+   npm run dev
+   ```
+   Open the printed `http://localhost:8787` URL. (Camera access requires
+   `https://` or `localhost`.)
+
+The site itself is fully static — all files live under [`public/`](public/).
+
+---
+
+## ☁️ Deploy to Cloudflare Workers
+
+ScanAR ships as static assets served from Cloudflare's edge (no Worker code
+required). Config lives in [`wrangler.toml`](wrangler.toml).
+
+1. Authenticate once:
+   ```bash
+   npx wrangler login
+   ```
+2. Deploy:
+   ```bash
+   npm run deploy
+   ```
+
+Wrangler uploads everything in `public/` and prints your
+`https://scanar.<your-subdomain>.workers.dev` URL. Re-run `npm run deploy`
+to publish updates.
