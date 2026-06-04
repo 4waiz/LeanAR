@@ -1,0 +1,11 @@
+name = "scanar"
+compatibility_date = "2025-06-04"
+
+# Serve the static site (HTML/CSS/JS/assets) directly from Cloudflare's edge.
+# No Worker script is needed — Cloudflare serves the files in `assets.directory`.
+[assets]
+directory = "./public"
+
+# Cache-busting / SPA-like behavior:
+# - not_found_handling = "404-page" returns the standard 404 for unknown paths.
+# - Static assets are served as-is; index.html is the default document.

@@ -1,0 +1,21 @@
+# Cloudflare static-asset response headers.
+
+# HTML should always be revalidated so users get the latest app shell.
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Camera access requires a secure context; nothing special needed beyond HTTPS,
+# which Cloudflare provides by default.
+
+# Hashed/static assets can be cached aggressively.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/css/*
+  Cache-Control: public, max-age=3600
+
+/js/*
+  Cache-Control: public, max-age=3600
